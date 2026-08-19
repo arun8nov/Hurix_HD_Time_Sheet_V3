@@ -123,22 +123,16 @@
         
         <form id="taskLogForm" onsubmit="handleTaskSubmit(event)">
           <div class="row g-3 mb-3">
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label small fw-bold">Client</label>
               <select id="taskClientSelect" class="form-select" onchange="onClientChange()" required>
                 <option value="">-- Select Client --</option>
               </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label small fw-bold">Project</label>
               <select id="taskProjectSelect" class="form-select" onchange="onProjectChange()" required>
                 <option value="">-- Select Project --</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-bold">Activity Type</label>
-              <select id="taskActivitySelect" class="form-select" required>
-                <option value="">-- Select Activity --</option>
               </select>
             </div>
           </div>
@@ -196,7 +190,6 @@
               <tr>
                 <th style="width: 35px;">#</th>
                 <th style="min-width: 140px;">Client & Project</th>
-                <th style="min-width: 120px;">Activity</th>
                 <th>Hours Worked</th>
                 <th>Units Done</th>
                 <th>Status</th>
@@ -206,7 +199,7 @@
             </thead>
             <tbody id="userTasksTableBody">
               <tr>
-                <td colspan="8" class="text-center text-muted py-4">No tasks logged for current shift.</td>
+                <td colspan="7" class="text-center text-muted py-4">No tasks logged for current shift.</td>
               </tr>
             </tbody>
             <tfoot id="userTasksTableFoot" class="table-light fw-bold"></tfoot>
