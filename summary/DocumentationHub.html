@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hurix Digital - Attendance & Productivity Hub | Management Documentation & Formula Master</title>
+
+  <!-- Google Fonts & FontAwesome 6 -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+    rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --hurix-primary: #0082c8;
+      --hurix-dark: #004b75;
+      --hurix-accent: #00c6ff;
+      --hurix-bg: #f8fafc;
+      --hurix-text: #0f172a;
+      --card-border: 1px solid #e2e8f0;
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--hurix-bg);
+      color: var(--hurix-text);
+      line-height: 1.65;
+      padding-bottom: 4rem;
+    }
+
+    .hub-container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    /* Floating Header Control Bar */
+    .hub-control-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 1.25rem 2rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+      border: var(--card-border);
+      margin-bottom: 2rem;
+      position: sticky;
+      top: 1rem;
+      z-index: 1000;
+    }
+
+    .brand-title {
+      color: var(--hurix-dark);
+      font-weight: 800;
+      font-size: 1.4rem;
+      letter-spacing: -0.5px;
+    }
+
+    .hub-badge {
+      background: linear-gradient(135deg, #0082c8 0%, #004b75 100%);
+      color: #ffffff;
+      padding: 0.35rem 0.85rem;
+      border-radius: 30px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* Tab Navigation */
+    .nav-pills-hurix {
+      background: #f1f5f9;
+      padding: 0.35rem;
+      border-radius: 12px;
+    }
+
+    .nav-pills-hurix .nav-link {
+      color: #64748b;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border-radius: 10px;
+      padding: 0.55rem 1.2rem;
+      transition: all 0.2s ease;
+    }
+
+    .nav-pills-hurix .nav-link.active {
+      background-color: var(--hurix-primary);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(0, 130, 200, 0.3);
+    }
+
+    .nav-pills-hurix .nav-link:hover:not(.active) {
+      color: var(--hurix-dark);
+      background-color: #e2e8f0;
+    }
+
+    /* Paper Document Card */
+    .doc-paper {
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+      padding: 2.5rem;
+      border: var(--card-border);
+      margin-bottom: 2rem;
+    }
+
+    .section-card {
+      background: #ffffff;
+      border: var(--card-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 1.75rem;
+      box-shadow: var(--card-shadow);
+    }
+
+    .section-title {
+      color: var(--hurix-dark);
+      font-weight: 800;
+      font-size: 1.25rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 0.6rem;
+    }
+
+    .section-title i {
+      color: var(--hurix-primary);
+      margin-right: 0.6rem;
+    }
+
+    .formula-box {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0.85rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      margin: 0.75rem 0;
+      border: 1px solid #1e293b;
+    }
+
+    .table-hurix {
+      font-size: 0.88rem;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+    }
+
+    .table-hurix thead th {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0.85rem 1rem;
+      border: none;
+    }
+
+    .table-hurix tbody td {
+      padding: 0.85rem 1rem;
+      vertical-align: middle;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .table-hurix tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-hurix tbody tr:hover {
+      background-color: #f8fafc;
+    }
+
+    .badge-rule {
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+
+    .rule-idle {
+      background: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+
+    .rule-block {
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
+
+    .rule-bench {
+      background: #f3e8ff;
+      color: #7e22ce;
+      border: 1px solid #d8b4fe;
+    }
+
+    .rule-prod {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+
+      .doc-paper {
+        box-shadow: none;
+        border: none;
+        padding: 0;
+      }
+
+      .tab-pane {
+        display: block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        margin-bottom: 3rem;
+        page-break-after: always;
+      }
+
+      .hub-control-card {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="hub-container">
+
+    <!-- Top Floating Header & Navigation Control Bar -->
+    <div class="hub-control-card no-print d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <div class="d-flex align-items-center">
+        <span class="brand-title me-3">Hurix Digital</span>
+        <span class="hub-badge">Attendace & Time Sheet Logic Master</span>
+      </div>
+
+      <!-- Tab Buttons (Reordered: User -> Admin -> Exec -> Bench vs Idle -> Schemas) -->
+      <ul class="nav nav-pills nav-pills-hurix" id="docTab" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="user-tab" data-bs-toggle="tab" data-bs-target="#user-pane" type="button"
+            role="tab">
+            <i class="fa-solid fa-user me-1.5"></i>1. User Portal
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin-pane" type="button"
+            role="tab">
+            <i class="fa-solid fa-user-shield me-1.5"></i>2. Admin Shift Monitor
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="exec-tab" data-bs-toggle="tab" data-bs-target="#exec-pane" type="button"
+            role="tab">
+            <i class="fa-solid fa-chart-pie me-1.5"></i>3. Executive Analytics
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="math-tab" data-bs-toggle="tab" data-bs-target="#math-pane" type="button"
+            role="tab">
+            <i class="fa-solid fa-scale-balanced me-1.5"></i>4. Bench vs Idle Governance
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="schema-tab" data-bs-toggle="tab" data-bs-target="#schema-pane" type="button"
+            role="tab">
+            <i class="fa-solid fa-database me-1.5"></i>5. Database Schemas
+          </button>
+        </li>
+      </ul>
+
+      <!-- Print Button -->
+      <div>
+        <button onclick="window.print()" class="btn btn-outline-primary fw-bold rounded-pill px-3 btn-sm">
+          <i class="fa-solid fa-print me-1"></i>Print PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB CONTENT CONTAINER -->
+    <div class="tab-content" id="docTabContent">
+
+      <!-- ========================================================================= -->
+      <!-- TAB 1: USER PORTAL VIEW (UserView.html)                                   -->
+      <!-- ========================================================================= -->
+      <div class="tab-pane fade show active" id="user-pane" role="tabpanel">
+        <div class="doc-paper">
+          <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+            <div>
+              <span class="badge bg-primary text-white px-3 py-1 rounded-pill small fw-bold text-uppercase">User Portal
+                Specification</span>
+              <h2 class="fw-extrabold text-dark mt-2 mb-0">Production Associate Guide & Task Entry Dictionary</h2>
+            </div>
+            <span class="text-muted small">Target View: <code>UserView.html</code></span>
+          </div>
+
+          <!-- 1.1 User KPIs -->
+          <div class="section-card">
+            <h3 class="section-title"><i class="fa-solid fa-chart-simple"></i>1. User View Scorecards & Meters</h3>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th style="width:22%;">UI Meter / Card</th>
+                    <th style="width:38%;">What It Is For (Purpose)</th>
+                    <th style="width:40%;">Calculation & Logic</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="fw-bold text-primary">Live Shift Duration Timer</td>
+                    <td>Provides associates live visibility into elapsed working time on shift today.</td>
+                    <td><code>Live Timer = (Current Timestamp - Clock In Time) - Total Breaks</code>. Increments every
+                      second.</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-warning">Break Duration (<code>userBreakMins</code>)</td>
+                    <td>Accumulated break minutes today to ensure compliance with shift pause limits.</td>
+                    <td>Sum of all closed break durations plus active ongoing break timer from <code>Break_Logs</code>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-info">Net Worked Hours</td>
+                    <td>Total attendance shift hours credited for today's shift.</td>
+                    <td><code>(Shift End - Shift Start) - (Break Mins / 60)</code>. (Locked on Clock Out).</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-teal" style="color:#0d9488;">Logged Task Hours</td>
+                    <td>Total duration across all submitted task work entries today.</td>
+                    <td><code>∑ actual_worked_hours</code> across all rows in user's task log table.</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-success">Earned Hours</td>
+                    <td>Standard output revenue credit produced based on completed deliverables.</td>
+                    <td><code>(Task Units Completed × AHT Benchmark Mins) / 60</code>. <em>(Bench tasks earn 0.00
+                        hrs)</em>.</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-danger">Performance Leakage</td>
+                    <td>Output shortfall between actual task time spent and earned benchmark credit.</td>
+                    <td><code>Max(0, Task Duration - Earned Hours - Blocked Hours)</code>. Blockers are deducted.</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-purple" style="color:#7e22ce;">Speed Efficiency %</td>
+                    <td>Visual pace badge (⚡ $\ge 100\%$, ⏱️ $80-99\%$, 🐢 $<80\%$).< /td>
+                    <td><code>Round((Earned Hours / Logged Task Hours) × 100)%</code>.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 1.2 Task Form Field Dictionary -->
+          <div class="section-card">
+            <h3 class="section-title"><i class="fa-solid fa-pen-to-square"></i>2. Task Entry Form & Log Table —
+              Field-by-Field Master Dictionary</h3>
+            <p class="small text-muted mb-3">Every input field in the task logging interface, why it exists, and how
+              associates must populate it:</p>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th style="width:20%;">Field Name</th>
+                    <th style="width:12%;">Input Type</th>
+                    <th style="width:34%;">Why It Exists (Operational Purpose)</th>
+                    <th style="width:34%;">How to Enter (User Guidelines)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="fw-bold">Active Client (<code>client</code>)</td>
+                    <td>Dropdown</td>
+                    <td>Identifies client account for billing, project grouping, and financial auditing.</td>
+                    <td>Select assigned client (e.g. <em>iMerit, Innodata, Hurix</em>). Auto-defaults from profile.</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Active Project (<code>project</code>)</td>
+                    <td>Dropdown</td>
+                    <td>Links work to specific workflow and auto-loads approved target AHT benchmark.</td>
+                    <td>Select from dynamic project dropdown associated with chosen client.</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Activity Type (<code>activity_type</code>)</td>
+                    <td>Dropdown</td>
+                    <td>Differentiates Production, Quality Audit, Rework, Bench, Training, and Downtime for billability.
+                    </td>
+                    <td>Select exact activity: <em>Production, Quality Audit, Rework, Training, Bench, Downtime</em>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Work Start / End Time</td>
+                    <td>Time Picker (HH:mm)</td>
+                    <td>Defines exact work window to compute actual worked task duration.</td>
+                    <td>Enter Start Time (e.g. <code>09:30 AM</code>) and End Time (e.g. <code>11:30 AM</code>).</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">Task Units Completed</td>
+                    <td>Number</td>
+                    <td>Quantifies deliverable volume completed (e.g. bounding boxes, pages, images) to calculate Earned
+                      Hours.</td>
+                    <td>Enter completed unit count as a positive integer (e.g. <code>45</code>).</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">AHT Benchmark (Mins)</td>
+                    <td>Number (Auto)</td>
+                    <td>Approved standard handling time in minutes per unit. Determines target earned speed credit.</td>
+                    <td>Auto-populates from <code>Client_Projects_Master</code>. Editable if custom activity.</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-primary">Blocked Minutes</td>
+                    <td>Number</td>
+                    <td>
+                      <strong>Protection for Client Queries & Clarifications:</strong><br>
+                      Time inside an active task where work was paused due to <strong>querying the client</strong>,
+                      waiting for client instructions/clarifications, or special instructions where the task does not
+                      meet standard AHT.
+                    </td>
+                    <td>If delayed while querying client or waiting for instructions, enter the exact minutes delayed
+                      (e.g. <code>20</code>). Deducted from leakage.</td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold">User Remarks</td>
+                    <td>Text</td>
+                    <td>Provides contextual audit trail notes, batch IDs, query ticket IDs, or downtime justifications
+                      for review.</td>
+                    <td>Optional/Mandatory on downtime: Enter client ticket ID, batch number, or specific task notes.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- TAB 2: ADMIN SHIFT MONITOR VIEW (AdminView.html)                          -->
+      <!-- ========================================================================= -->
+      <div class="tab-pane fade" id="admin-pane" role="tabpanel">
+        <div class="doc-paper">
+          <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+            <div>
+              <span class="badge bg-warning text-dark px-3 py-1 rounded-pill small fw-bold text-uppercase">Admin
+                Operations Specification</span>
+              <h2 class="fw-extrabold text-dark mt-2 mb-0">Live Shift Operations Monitor & Verification Hub</h2>
+            </div>
+            <span class="text-muted small">Target View: <code>AdminView.html</code></span>
+          </div>
+
+          <!-- 2.1 Admin KPIs -->
+          <div class="section-card">
+            <h3 class="section-title"><i class="fa-solid fa-gauge-high"></i>1. Admin Floor Scorecard KPIs</h3>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th style="width:18%;">Scorecard KPI</th>
+                    <th style="width:28%;">Description & Purpose</th>
+                    <th style="width:24%;">Business Logic</th>
+                    <th style="width:30%;">Exact Formula</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="fw-bold text-primary">TOTAL RESOURCES</td>
+                    <td>Total active staff enrolled in the operational workforce directory.</td>
+                    <td>Counts active directory staff in <code>User_Master</code> (excluding non-shift Super Admins).
+                    </td>
+                    <td><code>Total Resources = 78 Active Headcount</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-success">CLOCKED IN</td>
+                    <td>Associates currently present on shift for the target date.</td>
+                    <td>Unique staff count with shift status <code>OPEN</code>, <code>ON_BREAK</code>, or
+                      <code>CLOSED</code>.
+                    </td>
+                    <td><code>Count(Shift Status ∈ {OPEN, ON_BREAK, CLOSED})</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-warning">PENDING</td>
+                    <td>Associates who have not yet clocked in or submitted approved leave.</td>
+                    <td>Total floor capacity minus clocked-in staff and approved leave staff.</td>
+                    <td><code>Total (78) - Clocked In (54) - On Leave (12) = 12</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-danger">ON LEAVE (Shrink %)</td>
+                    <td>Staff on approved Planned (PL), Unplanned (UL), Half Day (HL), or Absent.</td>
+                    <td>Sum of all approved leave instances and calculated floor shrinkage percentage.</td>
+                    <td>
+                      <code>Leaves = PL + UL + (0.5 × HL) + ABSENT</code><br><code>Shrink % = (Leaves / 78) × 100</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-warning">ON BREAK</td>
+                    <td>Associates currently away on an active paused break.</td>
+                    <td>Real-time count of staff with shift status <code>ON_BREAK</code>.</td>
+                    <td><code>Count(Shift Status = 'ON_BREAK')</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-info">NET WORKED</td>
+                    <td>Cumulative shift attendance hours worked across all clocked-in staff.</td>
+                    <td>Sum of live running shift hours (or closed shift hours) minus all break minutes.</td>
+                    <td><code>∑ ((Shift End - Shift Start) - (Break Mins / 60))</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-teal" style="color:#0d9488;">GROSS WORKED</td>
+                    <td>Cumulative time spent on logged production and bench tasks.</td>
+                    <td>Sum of actual task duration across all submitted task logs today.</td>
+                    <td><code>∑ actual_worked_hours</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-danger">LEAKAGE LOSS</td>
+                    <td>Total operational output deficit across the entire floor today.</td>
+                    <td>Sum of performance leakage hours across all associates.</td>
+                    <td><code>∑ Max(0, Task Duration - Earned - Blocked)</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-purple" style="color:#7e22ce;">
+                      CARD 9: BLOCKED / BENCH<br>
+                      <small class="text-warning fw-bold">Subtitle: Idle Hours</small>
+                    </td>
+                    <td>
+                      <strong>Composite Metric Card</strong> displaying 3 distinct operational values:<br>
+                      1. <span class="badge-rule rule-idle">1st: IDLE</span> Staff <strong>ON project</strong> stalled
+                      by tool/file delays<br>
+                      2. <span class="badge-rule rule-block">2nd: BLOCKED</span> In-task pause querying client (deducted
+                      from leakage)<br>
+                      3. <span class="badge-rule rule-bench">3rd: BENCH</span> Staff with <strong>NO project</strong>
+                      (Training / Upskilling)
+                    </td>
+                    <td>
+                      1. • <strong>Idle Hours:</strong> Project technical downtime. Staff on active project stalled by
+                      tool crash or file delay (Earned=0, Bench=0, Leakage=0).<br>
+                      2. • <strong>Blocked Hours:</strong> Pauses inside active task due to querying client or client
+                      instructions not meeting AHT. Deducted from leakage.<br>
+                      3. • <strong>Bench Hours:</strong> Staff without projects doing internal training/upskilling
+                      (Earned=0, Idle=0, Leakage=0).
+                    </td>
+                    <td>
+                      <code>1. Idle = ∑ Task Hours (Activity='Downtime')</code><br>
+                      <code>2. Blocked = ∑ (Blocked Mins / 60)</code><br>
+                      <code>3. Bench = ∑ Task Hours (Project='Bench')</code><br>
+                      <small class="text-muted"><em>(Card UI: Blocked / Bench | Subtitle: Idle)</em></small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 2.2 Admin Tables -->
+          <div class="section-card">
+            <h3 class="section-title"><i class="fa-solid fa-table-list"></i>2. Admin Tables & Operational Flow</h3>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th style="width:22%;">Table Component</th>
+                    <th style="width:38%;">Column Structure & Content</th>
+                    <th style="width:40%;">Operational Logic & Formulas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="fw-bold text-primary">Live Employee Shift & Productivity Monitor (13 Columns)</td>
+                    <td>
+                      1. <code>Employee</code> (Name, ID, Email)<br>
+                      2. <code>Team/Mode</code> (Annotation/SME, Office/WFH)<br>
+                      3. <code>Shift Timings</code> (Start - End / Live)<br>
+                      4. <code>Break Mins</code> (Total Break Minutes)<br>
+                      5. <code>Perm (Hrs)</code> (Approved Permission)<br>
+                      6. <code>Net Worked</code> (Shift Worked Hours)<br>
+                      7. <code>Earned Hrs & Speed</code> (Earned + ⚡/⏱️/🐢 badge)<br>
+                      8. <code>Leakage Hrs</code> (Pacing Loss)<br>
+                      9. <code>Idle Hrs</code> (Client Downtime)<br>
+                      10. <code>Blocked Hrs</code> (Client Query / System Blocker)<br>
+                      11. <code>Bench Hrs</code> (Bench/Training Track)<br>
+                      12. <code>Status</code> (Pulse Dot + Status Badge)<br>
+                      13. <code>Action</code> (Inspect / Audit Logs Modal)
+                    </td>
+                    <td>
+                      • Real-time shift calculation: <code>Live Net Worked = (Now - Start) - Breaks</code>.<br>
+                      • Full Day Leave integrity: <code>Worked Hours strictly 0.00 hrs</code>.<br>
+                      • Half Day Leave integrity: <code>Worked Hours capped at ≤ 4.50 hrs max</code>.<br>
+                      • Speed Efficiency Badge: <code>Round((Earned / Task) × 100)%</code> (⚡ $\ge 100\%$, ⏱️ $80-99\%$,
+                      🐢 $<80\%$).<br>
+                        • Bench tasks produce <code>0.00 hrs earned</code> and <code>0.00 hrs idle</code>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-success">Leave & Permission Verification Queue</td>
+                    <td>
+                      • <code>Employee</code> (Name & ID)<br>
+                      • <code>Team</code> (Annotation / SME / XML)<br>
+                      • <code>Category</code> (PL, UL, HL, Permission)<br>
+                      • <code>Client / Project</code> (Assigned workflow)<br>
+                      • <code>Permission Hrs</code> (Duration)<br>
+                      • <code>Drive Proof URL</code> (Clickable link)<br>
+                      • <code>Actions</code> (Approve / Reject buttons)
+                    </td>
+                    <td>
+                      • Fetches pending requests from <code>Leave_Permission_Requests</code>.<br>
+                      • Managers click proof URL to verify medical/permission slip.<br>
+                      • Upon approval, updates <code>Attendance_Shift_Logs</code> status to PL/UL/HL immediately and
+                      sets shift status to <code>LEAVE_CLOSED</code>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-info">1-Click EOD Report Generator Modal</td>
+                    <td>
+                      • Section 1: Executive Headcount & Attendance KPIs<br>
+                      • Section 2: Shift Worked vs Task Hours vs Earned Hours<br>
+                      • Section 3: Project-Wise Hours & Efficiency Breakdown<br>
+                      • Section 4: Top 3 High Efficiency Contributors<br>
+                      • Section 5: Management Attention Exceptions (Leakage &gt; 1 hr)
+                    </td>
+                    <td>
+                      • Formats 1-click clipboard markdown copy for Slack/Teams/Email.<br>
+                      • Generates clean 1-page PDF printable document via <code>printEodReport()</code>.<br>
+                      • Exports multi-section structured CSV report via <code>exportEodReportCsv()</code>.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- TAB 3: EXECUTIVE ANALYTICS VIEW (ExecutiveSummaryView.html)               -->
+      <!-- ========================================================================= -->
+      <div class="tab-pane fade" id="exec-pane" role="tabpanel">
+        <div class="doc-paper">
+          <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+            <div>
+              <span class="badge bg-purple text-white px-3 py-1 rounded-pill small fw-bold text-uppercase"
+                style="background:#7e22ce;">Executive Analytics Specification</span>
+              <h2 class="fw-extrabold text-dark mt-2 mb-0">Multi-Period Governance & Matrix Specifications</h2>
+            </div>
+            <span class="text-muted small">Target View: <code>ExecutiveSummaryView.html</code></span>
+          </div>
+
+          <!-- 3.1 Executive KPIs -->
+          <div class="section-card">
+            <h3 class="section-title"><i class="fa-solid fa-chart-line"></i>1. Executive Analytics Scorecard KPIs</h3>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th style="width:18%;">Executive KPI</th>
+                    <th style="width:28%;">What It Is For & Why It Matters</th>
+                    <th style="width:24%;">Business Logic</th>
+                    <th style="width:30%;">Exact Formula</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="fw-bold text-primary">TOTAL RESOURCES</td>
+                    <td>Establishes the active resource capacity base over the selected period.</td>
+                    <td>Single-day view strictly equals <strong>78</strong>; Multi-day equals total employee-day
+                      instances.</td>
+                    <td><code>Single Day = 78</code><br><code>Period = 78 × Period Days</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-success">CLOCKED IN (Att %)</td>
+                    <td>Measures workforce attendance consistency and operational reporting rate.</td>
+                    <td>Total present days logged across the period and percentage against capacity.</td>
+                    <td><code>Att % = (Present Days / Total Staff Instances) × 100</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-warning">PENDING</td>
+                    <td>Highlights unrecorded workdays requiring manager timesheet reconciliation.</td>
+                    <td>Capacity minus present days minus approved leave days.</td>
+                    <td><code>Pending = Total Staff - Present Days - Leave Days</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-danger">ON LEAVE (Shrink %)</td>
+                    <td>Evaluates capacity lost to planned/unplanned leaves to guide floor staffing buffers.</td>
+                    <td>Sum of all PL, UL, HL, and Absent days over total capacity instances.</td>
+                    <td><code>Shrink % = (Total Leaves / Total Staff Instances) × 100</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-info">NET WORKED</td>
+                    <td>Total operational floor labor hours invested across the filtered period.</td>
+                    <td>Cumulative shift attendance hours across all associates.</td>
+                    <td><code>∑ ((Shift End - Shift Start) - (Breaks / 60))</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-teal" style="color:#0d9488;">GROSS WORKED</td>
+                    <td>Total active task effort logged into production workflows.</td>
+                    <td>Cumulative task hours recorded in <code>Project_Task_Logs</code>.</td>
+                    <td><code>∑ actual_worked_hours</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-success">EARNED HOURS</td>
+                    <td>Total billable standard production output revenue generated for clients.</td>
+                    <td>Sum of standard output credit earned from completed units $\times$ AHT.</td>
+                    <td><code>∑ ((Task Count × Benchmark AHT) / 60)</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-danger">LEAKAGE LOSS</td>
+                    <td>Financial and operational cost of productivity gaps across delivery teams.</td>
+                    <td>Sum of task execution leakage after deducting approved system blockers.</td>
+                    <td><code>∑ Max(0, Task Duration - Earned - Blocked)</code></td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-purple" style="color:#7e22ce;">
+                      CARD 9: BLOCKED / BENCH<br>
+                      <small class="text-warning fw-bold">Subtitle: Idle Hours</small>
+                    </td>
+                    <td>
+                      <strong>Composite Metric Card</strong> displaying 3 distinct operational values:<br>
+                      1. <span class="badge-rule rule-idle">1st: IDLE</span> Staff <strong>ON project</strong> stalled
+                      by tool/file delays<br>
+                      2. <span class="badge-rule rule-block">2nd: BLOCKED</span> In-task pause querying client (deducted
+                      from leakage)<br>
+                      3. <span class="badge-rule rule-bench">3rd: BENCH</span> Staff with <strong>NO project</strong>
+                      (Training)
+                    </td>
+                    <td>
+                      1. • <strong>Idle Hours:</strong> Project technical downtime. Staff on active project stalled by
+                      tool crash or file delay (Earned=0, Bench=0, Leakage=0).<br>
+                      2. • <strong>Blocked Hours:</strong> Pauses inside active task due to querying client or client
+                      instructions not meeting AHT. Deducted from leakage.<br>
+                      3. • <strong>Bench Hours:</strong> Staff without projects doing internal training/upskilling
+                      (Earned=0, Idle=0, Leakage=0).
+                    </td>
+                    <td>
+                      <code>1. Idle = ∑ Task Hours (Activity='Downtime')</code><br>
+                      <code>2. Blocked = ∑ (Blocked Mins / 60)</code><br>
+                      <code>3. Bench = ∑ Task Hours (Project='Bench')</code><br>
+                      <small class="text-muted"><em>(Card UI: Blocked / Bench | Subtitle: Idle)</em></small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 3.2 Executive Matrix Tables -->
+          <div class="section-card">
+            <h3 class="section-title"><i class="fa-solid fa-table-cells"></i>2. The 4 Executive Matrix Tables (What For,
+              Why For & Schema)</h3>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th style="width:20%;">Matrix Table</th>
+                    <th style="width:25%;">What For & Why It Matters</th>
+                    <th style="width:30%;">Columns & Schema</th>
+                    <th style="width:25%;">Formulas & Logic</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="fw-bold text-primary">1. Client-Wise Executive Matrix</td>
+                    <td>Enables Account Managers and Client Partners to track billable resource allocation,
+                      client-specific attendance, and shrinkage across client accounts (e.g. <em>iMerit, Innodata</em>).
+                    </td>
+                    <td>
+                      • <code>Client</code> (Account Name)<br>
+                      • <code>Total Resources</code> (Assigned headcount)<br>
+                      • <code>Clocked In</code> (Present count)<br>
+                      • <code>Pending</code> (Not clocked in)<br>
+                      • <code>Utilized</code> (Billable production staff)<br>
+                      • <code>Bench</code> (Non-billable bench staff)<br>
+                      • <code>On Leave</code> (Approved leaves)<br>
+                      • <code>Shrink %</code> (Absence rate)
+                    </td>
+                    <td>
+                      • <code>Utilized = Count(Staff with billable task hours > 0)</code><br>
+                      • <code>Bench = Count(Staff on bench/training only)</code><br>
+                      • <code>Shrink % = (On Leave / Total Resources) × 100</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-success">2. Team-Wise Executive Matrix</td>
+                    <td>Enables Department Heads to balance staffing and monitor discipline-specific capacity across
+                      <strong>Annotation (61)</strong>, <strong>SME (16)</strong>, and <strong>Management (1)</strong>.
+                    </td>
+                    <td>
+                      • <code>Team</code> (Annotation, SME, XML, Management)<br>
+                      • <code>Total Resources</code> (Directory headcount)<br>
+                      • <code>Clocked In</code> (Present count)<br>
+                      • <code>Pending</code> (Yet to clock in)<br>
+                      • <code>Utilized</code> (In production)<br>
+                      • <code>Bench</code> (In training/bench)<br>
+                      • <code>On Leave</code> (Leave volume)<br>
+                      • <code>Shrink %</code> (Team shrinkage rate)
+                    </td>
+                    <td>
+                      • Strictly validates active directory headcount (61 Annotation, 16 SME, 1 PM).<br>
+                      • <code>Shrink % = (Team Leaves / Team Resources) × 100</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-warning">3. Project Manager Executive Matrix</td>
+                    <td>Gives Operations Directors oversight into individual Delivery PM portfolios, tracking total
+                      shift hours managed, earned revenue output, and performance leakage.</td>
+                    <td>
+                      • <code>Project Manager</code> (PM Name)<br>
+                      • <code>Total Resources</code> (Supervised staff)<br>
+                      • <code>Shift Hours</code> (Net worked hours)<br>
+                      • <code>Gross Task Hours</code> (Task duration)<br>
+                      • <code>Earned Hours</code> (Productive output)<br>
+                      • <code>Leakage Hours</code> (Output gap)<br>
+                      • <code>Speed %</code> (Portfolio speed efficiency)
+                    </td>
+                    <td>
+                      • Groups metrics by <code>User_Master.pm</code>.<br>
+                      • <code>Speed % = Round((PM Earned / PM Task) × 100)%</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="fw-bold text-purple" style="color:#7e22ce;">4. Employee Period Performance Monitor Table
+                    </td>
+                    <td>Comprehensive historical associate appraisal roster used for performance appraisals, speed
+                      calibrations, and identifying top performers or coaching needs over any selected date range.</td>
+                    <td>
+                      • <code>Employee</code> (Name, ID, Email)<br>
+                      • <code>Team / Mode / Client / PM</code><br>
+                      • <code>Present / Leave / Pending Days</code><br>
+                      • <code>Shift Hours</code> (Total Net Worked)<br>
+                      • <code>Task Hours</code> (Total Gross Worked)<br>
+                      • <code>Earned Hours</code> (AHT Output Credit)<br>
+                      • <code>Leakage Hours</code> (Pacing Loss)<br>
+                      • <code>Idle / Bench / Blocked Hours</code><br>
+                      • <code>Speed Efficiency %</code> (⚡/⏱️/🐢 Badge)
+                    </td>
+                    <td>
+                      • Sortable by any column (Shift Hours, Earned Hours, Speed %).<br>
+                      • Speed Badge Thresholds: ⚡ $\ge 100\%$, ⏱️ $80-99\%$, 🐢 $<80\%$.<br>
+                        • Deduplicates attendance by employee and date so multi-day logs sum accurately without phantom
+                        duplicate records.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- TAB 4: BENCH VS IDLE VS PRODUCTION GOVERNANCE MASTER                     -->
+      <!-- ========================================================================= -->
+      <div class="tab-pane fade" id="math-pane" role="tabpanel">
+        <div class="doc-paper">
+          <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+            <div>
+              <span class="badge-rule rule-bench me-2"><i class="fa-solid fa-scale-balanced me-1"></i>Management
+                Priority Rule</span>
+              <h2 class="fw-extrabold text-dark mt-2 mb-0">Operational Governance: Bench vs Idle vs Blocked Hours</h2>
+            </div>
+            <span class="text-muted small">Strict Separation for Management & Finance</span>
+          </div>
+
+
+
+          <!-- 4.1 The 4 Operational Work States Compared -->
+          <div class="section-card">
+            <h3 class="section-title"><i class="fa-solid fa-table-columns"></i>1. Definitive Comparison: The 4
+              Operational Work States</h3>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th style="width:18%;">State Category</th>
+                    <th style="width:28%;">Exact Definition</th>
+                    <th style="width:18%;">Billability Status</th>
+                    <th style="width:18%;">Earned Hours Rule</th>
+                    <th style="width:18%;">Leakage Impact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="badge-rule rule-prod mb-1">🟢 Earbed Hours</span><br>
+                      <small class="fw-bold text-dark">Active Client Project Work</small>
+                    </td>
+                    <td>Associate is actively executing deliverables on a revenue-generating client project (e.g.
+                      <em>iMerit, Innodata</em>).
+                    </td>
+                    <td><strong class="text-success">100% Billable</strong></td>
+                    <td>
+                      <code class="text-success fw-bold">(Count × AHT) / 60</code><br>
+                      <small class="text-muted">Earns revenue credit</small>
+                    </td>
+                    <td>
+                      <code class="text-danger fw-bold">Actual - Earned - Blocked</code><br>
+                      <small class="text-muted">Subject to pacing gap</small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="badge-rule rule-idle mb-1">🟡 Idle Hours</span><br>
+                      <small class="fw-bold text-dark">1st: Project Downtime</small>
+                    </td>
+                    <td>
+                      Associate is assigned to an <strong>active client project</strong>, but stalled due to:
+                      <ul class="ps-3 mb-0" style="font-size:0.8rem;">
+                        <li>Client file/batch allocation delay</li>
+                        <li>Tool/platform crash or server outage</li>
+                        <li>Network/VPN disconnect</li>
+                      </ul>
+                    </td>
+                    <td><strong class="text-warning">Client Downtime</strong></td>
+                    <td>
+                      <code class="text-dark fw-bold">0.00 hrs</code><br>
+                      <small class="text-muted">Zero deliverable credit</small>
+                    </td>
+                    <td>
+                      <code class="text-success fw-bold">0.00 hrs (Exempt)</code><br>
+                      <small class="text-muted">100% exempt from leakage</small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="badge-rule rule-block mb-1">🔵 Blocked Time</span><br>
+                      <small class="fw-bold text-dark">2nd: Task Pause / Blocker</small>
+                    </td>
+                    <td>
+                      A pause inside an active task due to <strong>querying the client</strong>, awaiting client
+                      clarifications, or special client instructions where the task does not meet standard AHT time.
+                      Logged via <em>Blocked Minutes</em>.
+                    </td>
+                    <td><strong class="text-info">Production Blocker</strong></td>
+                    <td>
+                      <code class="text-success fw-bold">(Count × AHT) / 60</code><br>
+                      <small class="text-muted">Earns credit for units</small>
+                    </td>
+                    <td>
+                      <code class="text-info fw-bold">Deducted from Leakage</code><br>
+                      <small class="text-muted">Protects associate score</small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="badge-rule rule-bench mb-1">🟣 Bench Hours</span><br>
+                      <small class="fw-bold text-dark">3rd: No Client Project</small>
+                    </td>
+                    <td>
+                      Associate has <strong>NO active client project</strong>. Engaged in internal training, upskilling,
+                      floor support, or awaiting project allocation.
+                    </td>
+                    <td><strong class="text-purple" style="color:#7e22ce;">Non-Billable Internal</strong></td>
+                    <td>
+                      <code class="text-dark fw-bold">0.00 hrs</code><br>
+                      <small class="text-muted">Cannot bill client for bench</small>
+                    </td>
+                    <td>
+                      <code class="text-success fw-bold">0.00 hrs (Exempt)</code><br>
+                      <small class="text-muted">Zero leakage penalty</small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 4.2 Master Formula Index -->
+          <div class="section-card">
+            <h3 class="section-title"><i class="fa-solid fa-calculator"></i>2. Master Mathematical Formula Index (All
+              Dashboards)</h3>
+
+            <div class="row g-3">
+              <!-- Formula 1: Net Worked -->
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                  <span class="fw-bold text-primary small text-uppercase">1. Net Worked Hours (Shift Hours)</span>
+                  <div class="formula-box">Net Worked = (Shift End - Shift Start) - (Total Breaks Mins / 60)</div>
+                  <p class="small text-muted mb-0">Actual physical shift time spent on the floor. <em>(Full Day Leave =
+                      strictly 0.00 hrs; Half Day Leave capped at ≤ 4.50 hrs max).</em></p>
+                </div>
+              </div>
+
+              <!-- Formula 2: Earned Hours -->
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                  <span class="fw-bold text-success small text-uppercase">2. Billable Earned Hours (Standard
+                    Output)</span>
+                  <div class="formula-box">Earned Hours = (Completed Task Units × Benchmark AHT Mins) / 60</div>
+                  <p class="small text-muted mb-0">Authorized standard billable revenue output produced. <em>(Bench
+                      tasks and Downtime tasks strictly generate 0.00 hrs).</em></p>
+                </div>
+              </div>
+
+              <!-- Formula 3: Performance Leakage -->
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                  <span class="fw-bold text-danger small text-uppercase">3. Performance Leakage (Output Deficit)</span>
+                  <div class="formula-box">Leakage = Max(0, Actual Task Duration - Earned Hours - Blocked Hours)</div>
+                  <p class="small text-muted mb-0">Pacing loss between time spent and units delivered. Blocked minutes
+                    for client queries are deducted to ensure fair employee scoring.</p>
+                </div>
+              </div>
+
+              <!-- Formula 4: Speed Efficiency % -->
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                  <span class="fw-bold text-purple small text-uppercase" style="color:#7e22ce;">4. Speed Efficiency %
+                    (Benchmark Velocity)</span>
+                  <div class="formula-box">Speed Efficiency % = Round((Earned Hours / Actual Task Hours) × 100)%</div>
+                  <p class="small text-muted mb-0">
+                    Pacing index: <span class="badge bg-success">⚡ ≥ 100% High Speed</span> &nbsp;
+                    <span class="badge bg-primary">⏱️ 80-99% Target Pace</span> &nbsp;
+                    <span class="badge bg-warning text-dark">🐢 &lt; 80% Below Pace</span>
+                  </p>
+                </div>
+              </div>
+
+              <!-- Formula 5: Floor Shrinkage % -->
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                  <span class="fw-bold text-dark small text-uppercase">5. Floor Shrinkage Rate %</span>
+                  <div class="formula-box">Shrinkage % = (Total Leaves / Total Floor Staff Capacity) × 100</div>
+                  <p class="small text-muted mb-0">Where <code>Total Leaves = PL + UL + (0.5 × HL) + ABSENT</code>.
+                    Evaluates lost capacity across the floor.</p>
+                </div>
+              </div>
+
+              <!-- Formula 6: Pending Staff -->
+              <div class="col-md-6">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                  <span class="fw-bold text-warning small text-uppercase">6. Pending / Yet to Clock In Staff</span>
+                  <div class="formula-box">Pending = Total Staff (78) - Clocked In (54) - On Leave (12) = 12</div>
+                  <p class="small text-muted mb-0">Strict balance verification ensuring active floor headcount always
+                    adds up to 78 resources.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================================================= -->
+      <!-- TAB 5: DATABASE SCHEMAS & DATA MODEL                                      -->
+      <!-- ========================================================================= -->
+      <div class="tab-pane fade" id="schema-pane" role="tabpanel">
+        <div class="doc-paper">
+          <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+            <div>
+              <span class="badge bg-dark text-white px-3 py-1 rounded-pill small fw-bold text-uppercase">Data
+                Architecture</span>
+              <h2 class="fw-extrabold text-dark mt-2 mb-0">Google Sheets Database Schemas & Data Model</h2>
+            </div>
+            <span class="text-muted small">Backend Engine: Google Apps Script + Google Sheets</span>
+          </div>
+
+          <!-- Table 1: User_Master -->
+          <div class="section-card">
+            <h4 class="fw-bold text-primary mb-2"><i class="fa-solid fa-table me-2"></i>1. <code>User_Master</code>
+              (Employee Directory & Access)</h4>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th>Column Name</th>
+                    <th>Data Type</th>
+                    <th>Description & Constraints</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>emp_id</code></td>
+                    <td>String (PK)</td>
+                    <td>Unique Hurix Employee Identification Code (e.g. <code>C1201</code>).</td>
+                  </tr>
+                  <tr>
+                    <td><code>emp_name</code></td>
+                    <td>String</td>
+                    <td>Full Name of the employee.</td>
+                  </tr>
+                  <tr>
+                    <td><code>email</code></td>
+                    <td>String (Unique)</td>
+                    <td>Corporate Google Workspace email address.</td>
+                  </tr>
+                  <tr>
+                    <td><code>password</code></td>
+                    <td>String</td>
+                    <td>Encrypted / salted password string for fallback authentication.</td>
+                  </tr>
+                  <tr>
+                    <td><code>app_role</code></td>
+                    <td>String</td>
+                    <td>Access tier: <code>user</code>, <code>admin</code>, <code>executive</code>,
+                      <code>management admin</code>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><code>team</code></td>
+                    <td>String</td>
+                    <td>Functional operational group: <code>Annotation</code>, <code>SME</code>, <code>XML</code>,
+                      <code>Management</code>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><code>work_mode</code></td>
+                    <td>String</td>
+                    <td>Employment work arrangement: <code>Office</code>, <code>WFH</code>, <code>Hybrid</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>client</code></td>
+                    <td>String</td>
+                    <td>Primary assigned client account (e.g. <code>iMerit</code>, <code>Innodata</code>).</td>
+                  </tr>
+                  <tr>
+                    <td><code>project</code></td>
+                    <td>String</td>
+                    <td>Default assigned project workflow.</td>
+                  </tr>
+                  <tr>
+                    <td><code>pm</code></td>
+                    <td>String</td>
+                    <td>Assigned Delivery Project Manager Name.</td>
+                  </tr>
+                  <tr>
+                    <td><code>is_active</code></td>
+                    <td>Boolean</td>
+                    <td>Active directory flag (<code>TRUE</code> / <code>FALSE</code>).</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Table 2: Attendance_Shift_Logs -->
+          <div class="section-card">
+            <h4 class="fw-bold text-success mb-2"><i class="fa-solid fa-table me-2"></i>2.
+              <code>Attendance_Shift_Logs</code> (Daily Shift Records)
+            </h4>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th>Column Name</th>
+                    <th>Data Type</th>
+                    <th>Description & Formulas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>log_id</code></td>
+                    <td>String (PK)</td>
+                    <td>Unique Shift Log ID (e.g. <code>ATT-20260817-C1201-102938</code>).</td>
+                  </tr>
+                  <tr>
+                    <td><code>emp_id</code></td>
+                    <td>String (FK)</td>
+                    <td>Employee ID referencing <code>User_Master</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>date</code></td>
+                    <td>Date (YYYY-MM-DD)</td>
+                    <td>Calendar date of the shift.</td>
+                  </tr>
+                  <tr>
+                    <td><code>shift_start_time</code></td>
+                    <td>Time (HH:mm:ss)</td>
+                    <td>Timestamp when employee initiated shift clock-in.</td>
+                  </tr>
+                  <tr>
+                    <td><code>shift_end_time</code></td>
+                    <td>Time (HH:mm:ss)</td>
+                    <td>Timestamp when employee closed shift clock-out.</td>
+                  </tr>
+                  <tr>
+                    <td><code>total_break_minutes</code></td>
+                    <td>Number</td>
+                    <td>Cumulative break duration in minutes summed from <code>Break_Logs</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>total_shift_hours</code></td>
+                    <td>Number (Formula)</td>
+                    <td><code>Max(0, (End - Start) - (Break Mins / 60))</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>attendance_status</code></td>
+                    <td>String</td>
+                    <td><code>PRESENT</code>, <code>PL</code>, <code>UL</code>, <code>HL</code>,
+                      <code>PERMISSION</code>, <code>ABSENT</code>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><code>shift_status</code></td>
+                    <td>String</td>
+                    <td><code>OPEN</code>, <code>ON_BREAK</code>, <code>CLOSED</code>, <code>LEAVE_CLOSED</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>permission_hours</code></td>
+                    <td>Number</td>
+                    <td>Approved shift leave permission duration in hours.</td>
+                  </tr>
+                  <tr>
+                    <td><code>proof_url</code></td>
+                    <td>String (URL)</td>
+                    <td>Google Drive proof document URL (medical/permission slip).</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Table 3: Break_Logs -->
+          <div class="section-card">
+            <h4 class="fw-bold text-warning mb-2"><i class="fa-solid fa-table me-2"></i>3. <code>Break_Logs</code>
+              (Granular Break Tracking)</h4>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th>Column Name</th>
+                    <th>Data Type</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>break_id</code></td>
+                    <td>String (PK)</td>
+                    <td>Unique Break Record ID (e.g. <code>BRK-20260817-C1201-445892</code>).</td>
+                  </tr>
+                  <tr>
+                    <td><code>log_id</code></td>
+                    <td>String (FK)</td>
+                    <td>Parent Shift Log ID referencing <code>Attendance_Shift_Logs</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>emp_id</code></td>
+                    <td>String (FK)</td>
+                    <td>Employee ID referencing <code>User_Master</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>break_start_time</code></td>
+                    <td>Time (HH:mm:ss)</td>
+                    <td>Timestamp when break was initiated.</td>
+                  </tr>
+                  <tr>
+                    <td><code>break_end_time</code></td>
+                    <td>Time (HH:mm:ss)</td>
+                    <td>Timestamp when associate clicked Resume Shift.</td>
+                  </tr>
+                  <tr>
+                    <td><code>duration_minutes</code></td>
+                    <td>Number (Formula)</td>
+                    <td>Calculated elapsed duration in minutes <code>(End - Start)</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>status</code></td>
+                    <td>String</td>
+                    <td><code>ACTIVE</code> (currently on break) or <code>CLOSED</code>.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Table 4: Project_Task_Logs -->
+          <div class="section-card">
+            <h4 class="fw-bold text-info mb-2"><i class="fa-solid fa-table me-2"></i>4. <code>Project_Task_Logs</code>
+              (Work Output & Task Entries)</h4>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th>Column Name</th>
+                    <th>Data Type</th>
+                    <th>Description & Governance Rules</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>task_id</code></td>
+                    <td>String (PK)</td>
+                    <td>Unique Task Record ID (e.g. <code>TASK-20260817-C1201-839201</code>).</td>
+                  </tr>
+                  <tr>
+                    <td><code>emp_id</code></td>
+                    <td>String (FK)</td>
+                    <td>Employee ID referencing <code>User_Master</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>client</code> / <code>project</code></td>
+                    <td>String</td>
+                    <td>Client and Project name.</td>
+                  </tr>
+                  <tr>
+                    <td><code>activity_type</code></td>
+                    <td>String</td>
+                    <td><code>Production</code>, <code>Quality Audit</code>, <code>Rework</code>, <code>Bench</code>,
+                      <code>Training</code>, <code>Downtime</code>.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><code>work_start_time</code> / <code>work_end_time</code></td>
+                    <td>Time</td>
+                    <td>Task start and end timestamps.</td>
+                  </tr>
+                  <tr>
+                    <td><code>actual_worked_hours</code></td>
+                    <td>Number</td>
+                    <td>Task duration in hours <code>(End - Start)</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>task_count</code></td>
+                    <td>Number</td>
+                    <td>Completed production units.</td>
+                  </tr>
+                  <tr>
+                    <td><code>aht_benchmark_mins</code></td>
+                    <td>Number</td>
+                    <td>Standard Average Handling Time in minutes.</td>
+                  </tr>
+                  <tr>
+                    <td><code>productive_hours</code></td>
+                    <td>Number (Formula)</td>
+                    <td>Earned Hours: <code>(Task Count × AHT) / 60</code> (0.00 for Bench).</td>
+                  </tr>
+                  <tr>
+                    <td><code>performance_leakage_hours</code></td>
+                    <td>Number (Formula)</td>
+                    <td><code>Max(0, Actual Worked - Earned Hours - Blocked Hours)</code>.</td>
+                  </tr>
+                  <tr>
+                    <td><code>blocked_hours</code></td>
+                    <td>Number</td>
+                    <td>Pause inside task due to querying client or client instructions.</td>
+                  </tr>
+                  <tr>
+                    <td><code>bench_hours</code></td>
+                    <td>Number</td>
+                    <td>Hours spent on Bench / Training / Floor Management.</td>
+                  </tr>
+                  <tr>
+                    <td><code>idle_hours</code></td>
+                    <td>Number</td>
+                    <td>Technical downtime during active client production.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Table 5: Client_Projects_Master -->
+          <div class="section-card">
+            <h4 class="fw-bold text-dark mb-2"><i class="fa-solid fa-table me-2"></i>5.
+              <code>Client_Projects_Master</code> (AHT Benchmarks & Pricing)
+            </h4>
+            <div class="table-responsive">
+              <table class="table table-hurix w-100">
+                <thead>
+                  <tr>
+                    <th>Column Name</th>
+                    <th>Data Type</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>client_name</code></td>
+                    <td>String</td>
+                    <td>Client Account Name (e.g. <code>iMerit</code>, <code>Innodata</code>).</td>
+                  </tr>
+                  <tr>
+                    <td><code>project_name</code></td>
+                    <td>String</td>
+                    <td>Project Workflow Title.</td>
+                  </tr>
+                  <tr>
+                    <td><code>is_billable</code></td>
+                    <td>Boolean</td>
+                    <td><code>TRUE</code> for Client Production; <code>FALSE</code> for Bench/Training.</td>
+                  </tr>
+                  <tr>
+                    <td><code>default_aht_minutes</code></td>
+                    <td>Number</td>
+                    <td>Baseline Average Handling Time in minutes per completed unit.</td>
+                  </tr>
+                  <tr>
+                    <td><code>activity_categories</code></td>
+                    <td>String</td>
+                    <td>Comma-separated supported activity types.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- FOOTER -->
+          <div class="text-center text-muted small pt-4 mt-4 border-top">
+            Hurix Digital Operations & Systems Documentation &nbsp;|&nbsp; Management Operations & Logic Master
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Bootstrap 5 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

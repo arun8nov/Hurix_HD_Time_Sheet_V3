@@ -1,0 +1,510 @@
+<style>
+:root {
+  --hurix-primary: #0082c8;
+  --hurix-dark: #004b75;
+  --hurix-gradient: linear-gradient(135deg, #0082c8 0%, #004b75 100%);
+  --hurix-gradient-accent: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+  --hurix-bg: #f4f7fb;
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+body {
+  background-color: var(--hurix-bg);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #1e293b;
+  min-height: 100vh;
+}
+
+/* Navbar */
+.navbar-hurix {
+  background: var(--hurix-gradient);
+  box-shadow: 0 4px 25px rgba(0, 130, 200, 0.25);
+}
+
+/* Cards & Glassmorphism */
+.card-hurix {
+  border: var(--glass-border);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hurix:hover {
+  box-shadow: 0 14px 30px -5px rgba(0, 130, 200, 0.12);
+}
+
+/* Buttons */
+.btn-hurix {
+  background: var(--hurix-gradient);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 10px;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  transition: all 0.25s ease;
+}
+
+.btn-hurix:hover {
+  background: var(--hurix-dark);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 130, 200, 0.3);
+}
+
+.btn-hurix-outline {
+  border: 2px solid var(--hurix-primary);
+  color: var(--hurix-primary);
+  font-weight: 600;
+  border-radius: 10px;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-hurix-outline:hover {
+  background: var(--hurix-primary);
+  color: #ffffff;
+}
+
+/* Status Badges */
+.badge-status {
+  padding: 0.45em 0.85em;
+  font-weight: 700;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.badge-open {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.badge-break {
+  background-color: #fef9c3;
+  color: #a16207;
+  border: 1px solid #fef08a;
+}
+
+.badge-closed {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.badge-not-clocked {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+/* Glowing Pulse Animations */
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+@keyframes pulse-amber {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.pulse-dot-green {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  animation: pulse-green 1.8s infinite;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.pulse-dot-amber {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #f59e0b;
+  animation: pulse-amber 1.8s infinite;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+/* KPI Scorecard Widgets */
+.kpi-card {
+  border-left: 4px solid var(--hurix-primary);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 1.25rem;
+  box-shadow: var(--card-shadow);
+}
+
+.kpi-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* Premium KPI Scorecard Widgets Engine */
+.kpi-row-container {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.kpi-card-item {
+  flex: 1 1 0;
+  min-width: 125px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid var(--hurix-primary);
+  border-radius: 14px;
+  padding: 0.65rem 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.kpi-card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 130, 200, 0.12);
+  border-color: #cbd5e1;
+}
+
+.kpi-icon-pill {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.kpi-val-text {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.kpi-sub-text {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Live Shift Monitor Scroll Box Engine */
+.table-hurix-container {
+  max-height: 550px !important;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+  position: relative !important;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.table-hurix {
+  width: 100%;
+  margin-bottom: 0 !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  table-layout: auto;
+}
+
+/* 1. FROZEN TOP HEADER ROW */
+.table-hurix thead,
+.table-hurix thead tr,
+.table-hurix thead th,
+.table-hurix-container thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  font-weight: 700;
+  font-size: 0.75rem !important;
+  text-transform: uppercase;
+  border-bottom: 2px solid #cbd5e1 !important;
+  padding: 0.45rem 0.55rem !important;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+  background-clip: padding-box;
+  white-space: nowrap !important;
+}
+
+/* 2. FROZEN BOTTOM FOOTER ROW */
+.table-hurix tfoot,
+.table-hurix tfoot tr,
+.table-hurix tfoot td,
+.table-hurix tfoot th,
+.table-hurix-container tfoot td,
+.table-hurix-container tfoot th {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 90 !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  font-weight: 700;
+  font-size: 0.78rem !important;
+  border-top: 2px solid #cbd5e1 !important;
+  padding: 0.45rem 0.55rem !important;
+  box-shadow: 0 -3px 6px rgba(0, 0, 0, 0.08);
+  background-clip: padding-box;
+  white-space: nowrap !important;
+}
+
+.table-hurix tbody td {
+  padding: 0.45rem 0.55rem !important;
+  vertical-align: middle;
+  font-size: 0.8rem !important;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap !important;
+}
+
+/* 3. FROZEN STICKY FIRST COLUMN (EMPLOYEE NAME & ID) */
+.table-hurix tbody td:first-child {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 102 !important;
+  background-color: #ffffff !important;
+  box-shadow: 3px 0 6px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 4. FROZEN TOP-LEFT HEADER CORNER CELL (STUCK BOTH TOP & LEFT) */
+.table-hurix thead th:first-child,
+.table-hurix-container thead th:first-child {
+  position: sticky !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 140 !important;
+  background-color: #f8fafc !important;
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 5. FROZEN BOTTOM-LEFT FOOTER CORNER CELL (STUCK BOTH BOTTOM & LEFT) */
+.table-hurix tfoot td:first-child,
+.table-hurix tfoot th:first-child,
+.table-hurix-container tfoot td:first-child,
+.table-hurix-container tfoot th:first-child {
+  position: sticky !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  z-index: 130 !important;
+  background-color: #f8fafc !important;
+  box-shadow: 3px -3px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.table-hurix tbody tr:hover td:first-child {
+  background-color: #f1f5f9 !important;
+}
+
+.table-hurix tbody tr:hover td {
+  background-color: #f8fafc;
+}
+
+/* Compact Extra-Small Button Utility */
+.btn-xs {
+  padding: 0.15rem 0.4rem !important;
+  font-size: 0.72rem !important;
+  line-height: 1.2 !important;
+  border-radius: 6px !important;
+}
+
+/* Live Timer Pill */
+.timer-pill {
+  background: #0f172a;
+  color: #38bdf8;
+  font-family: monospace;
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 0.35rem 1rem;
+  border-radius: 30px;
+  display: inline-block;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Modal styling */
+.modal-content-hurix {
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Interactive Shift Timeline Visualizer Bar */
+.shift-timeline-wrapper {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.timeline-bar-container {
+  height: 24px;
+  background: #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.timeline-segment-billable {
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  height: 100%;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.timeline-segment-training {
+  background: linear-gradient(90deg, #0d9488, #059669);
+  height: 100%;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.timeline-segment-downtime {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  height: 100%;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.timeline-segment-break {
+  background: linear-gradient(90deg, #a855f7, #7e22ce);
+  height: 100%;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.timeline-segment-gap {
+  background: #cbd5e1;
+  height: 100%;
+}
+
+/* Google Sheets Style Column Filter Popover */
+.col-filter-btn {
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: #64748b;
+  line-height: 1;
+}
+
+.col-filter-btn:hover {
+  background-color: rgba(0, 130, 200, 0.15);
+  color: var(--hurix-primary, #0082c8);
+}
+
+.col-filter-btn.col-filter-active {
+  background-color: #0082c8 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(0, 130, 200, 0.3);
+}
+
+.col-filter-popover {
+  position: absolute;
+  z-index: 1050;
+  width: 285px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  font-size: 0.82rem;
+  overflow: hidden;
+  animation: fadeInDown 0.15s ease-out;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.col-filter-popover-header {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.6rem 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.col-filter-popover-body {
+  padding: 0.75rem;
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+.col-filter-section-title {
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.col-filter-checklist {
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+  background: #fafafa;
+}
+
+.col-filter-checklist .form-check {
+  margin-bottom: 0.25rem;
+  line-height: 1.2;
+}
+
+.col-filter-checklist .form-check-label {
+  font-size: 0.78rem;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+  word-break: break-word;
+}
+
+.col-filter-popover-footer {
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+</style>

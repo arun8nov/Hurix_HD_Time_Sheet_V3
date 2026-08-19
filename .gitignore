@@ -1,0 +1,8 @@
+# Temporary / Scratch Files
+pdf1_extracted.txt
+pdf2_extracted.txt
+pdf1_images/
+pdf2_images/
+update_index_pro.py
+*.tmp
+*.log

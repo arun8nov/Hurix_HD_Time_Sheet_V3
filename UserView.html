@@ -1,0 +1,353 @@
+<!-- EMPLOYEE PORTAL (UserView) -->
+<div id="userViewWrapper">
+
+  <!-- MODULE E: MISSING TIMESHEET ALERT BANNER -->
+  <div id="missingTimesheetBanner" class="alert alert-warning border border-warning shadow-sm rounded-4 p-3 mb-4 d-none">
+    <div class="d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center">
+        <span class="fs-3 text-warning me-3"><i class="fa-solid fa-triangle-exclamation"></i></span>
+        <div>
+          <h6 class="fw-bold mb-1 text-dark">Missing Timesheet Alert</h6>
+          <span class="small text-muted" id="missingDatesText">You have missing timesheets for recent workdays.</span>
+        </div>
+      </div>
+      <button onclick="openLeaveModal()" class="btn btn-warning btn-sm fw-bold px-3">
+        <i class="fa-solid fa-file-pen me-1"></i>Back-Submit Entry
+      </button>
+    </div>
+  </div>
+
+  <!-- TOP SHIFT CONTROL BAR -->
+  <div class="card card-hurix p-4 mb-4">
+    <div class="row align-items-center">
+      <div class="col-lg-6 mb-3 mb-lg-0">
+        <div class="d-flex align-items-center">
+          <div class="me-3">
+            <span id="shiftStatusBadge" class="badge-status badge-closed">CLOSED</span>
+          </div>
+          <div>
+            <div class="text-muted small fw-semibold" id="shiftTimerLabel">Active Shift Duration</div>
+            <div id="activeShiftTimer" class="timer-pill mt-1">00:00:00</div>
+            
+            <!-- CLOCK IN & CLOCK OUT TIME BADGES -->
+            <div class="mt-2 d-flex align-items-center flex-wrap gap-2">
+              <span class="badge bg-light text-dark border px-2 py-1 small">
+                <i class="fa-solid fa-play text-success me-1"></i>Clock In: <strong id="userClockInDisplay" class="text-primary">--:--</strong>
+              </span>
+              <span class="badge bg-light text-dark border px-2 py-1 small">
+                <i class="fa-solid fa-stop text-danger me-1"></i>Clock Out: <strong id="userClockOutDisplay" class="text-danger">--:--</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6 text-lg-end">
+        <div class="d-flex flex-wrap align-items-center justify-content-lg-end gap-2">
+          <!-- Clock In Button -->
+          <button id="clockInBtn" onclick="handleClockIn()" class="btn btn-hurix">
+            <i class="fa-solid fa-play me-2"></i>Clock In Shift
+          </button>
+
+          <!-- Apply Leave / Permission Button -->
+          <button id="applyLeaveBtn" onclick="openLeaveModal()" class="btn btn-hurix-outline">
+            <i class="fa-solid fa-calendar-minus me-2"></i>Apply Leave / Permission
+          </button>
+
+          <!-- Clock Out Button -->
+          <button id="clockOutBtn" onclick="openClockOutModal()" class="btn btn-danger fw-bold d-none">
+            <i class="fa-solid fa-stop me-2"></i>Clock Out Shift
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAILY SHIFT CLOSED SUMMARY CARD -->
+    <div id="shiftClosedSummary" class="mt-3 p-3 bg-light rounded-3 border d-none">
+      <div class="row text-center text-md-start align-items-center">
+        <div class="col-md-3 mb-2 mb-md-0">
+          <small class="text-muted d-block fw-bold">Attendance Status</small>
+          <span id="summaryAttStatus" class="badge bg-primary text-white fs-6">Present</span>
+        </div>
+        <div class="col-md-3 mb-2 mb-md-0">
+          <small class="text-muted d-block fw-bold">Clock In / Out</small>
+          <span id="summaryClockTimes" class="fw-bold text-dark">09:00 AM - 06:00 PM</span>
+        </div>
+        <div class="col-md-3 mb-2 mb-md-0">
+          <small class="text-muted d-block fw-bold">Total Net Worked</small>
+          <span id="summaryWorkedHours" class="fw-bold text-success">8.00 hrs</span>
+        </div>
+        <div class="col-md-3">
+          <small class="text-muted d-block fw-bold">Proof Attachment</small>
+          <span id="summaryProofLink" class="small"><span class="text-muted">No attachment</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHIFT & TODAY'S ACTIVITY OVERVIEW RIBBON -->
+  <div class="card card-hurix p-3 mb-4">
+    <div class="row g-3 text-center text-md-start align-items-center">
+      <div class="col-md-3 col-6 border-end-md">
+        <div class="text-muted small fw-bold text-uppercase"><i class="fa-solid fa-clock text-primary me-1"></i>Shift Timer</div>
+        <div class="d-flex align-items-baseline gap-2 mt-1">
+          <span id="userShiftDurationSummary" class="fs-5 fw-bold text-primary">00:00:00</span>
+          <span class="badge bg-light text-secondary border small"><i class="fa-solid fa-mug-hot text-warning me-1"></i>1h Default Break</span>
+        </div>
+      </div>
+      <div class="col-md-3 col-6 border-end-md">
+        <div class="text-muted small fw-bold text-uppercase"><i class="fa-solid fa-business-time text-success me-1"></i>Clock In / Out</div>
+        <div class="mt-1 fw-bold text-dark">
+          <span id="userClockInText" class="text-success">--:--</span> &rarr; <span id="userClockOutText" class="text-danger">--:--</span>
+        </div>
+      </div>
+      <div class="col-md-3 col-6 border-end-md">
+        <div class="text-muted small fw-bold text-uppercase"><i class="fa-solid fa-list-check text-info me-1"></i>Today's Logged Tasks</div>
+        <div class="fs-5 fw-bold text-dark mt-1"><span id="userTotalTasksLogged">0</span> <small class="text-muted fs-6 fw-normal">entries</small></div>
+      </div>
+      <div class="col-md-3 col-6">
+        <div class="text-muted small fw-bold text-uppercase"><i class="fa-solid fa-layer-group text-success me-1"></i>Total Units Done</div>
+        <div class="fs-5 fw-bold text-success mt-1"><span id="userTotalUnitsCompleted">0</span> <small class="text-muted fs-6 fw-normal">units</small></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK LOGGING & ACTIVITY SECTION -->
+  <div class="row g-4">
+    <!-- LEFT: SIMPLIFIED TASK ENTRY FORM -->
+    <div class="col-lg-5">
+      <div class="card card-hurix p-4">
+        <h5 class="fw-bold mb-3 d-flex align-items-center">
+          <i class="fa-solid fa-pen-to-square text-primary me-2"></i>Log Task Activity
+        </h5>
+        
+        <form id="taskLogForm" onsubmit="handleTaskSubmit(event)">
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label small fw-bold">Client</label>
+              <select id="taskClientSelect" class="form-select" onchange="onClientChange()" required>
+                <option value="">-- Select Client --</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold">Project</label>
+              <select id="taskProjectSelect" class="form-select" onchange="onProjectChange()" required>
+                <option value="">-- Select Project --</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-bold">Activity Type</label>
+              <select id="taskActivitySelect" class="form-select" required>
+                <option value="">-- Select Activity --</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold"><i class="fa-solid fa-hourglass-half text-primary me-1"></i>Hours Worked (hrs)</label>
+              <input type="number" id="taskHoursWorkedInput" class="form-control" step="0.25" min="0.1" max="24" required placeholder="e.g. 2.5">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold"><i class="fa-solid fa-cubes-stacked text-success me-1"></i>No. of Units Done</label>
+              <input type="number" id="taskCountInput" class="form-control" min="0" required placeholder="e.g. 15">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Task Status</label>
+              <select id="taskStatusSelect" class="form-select">
+                <option value="COMPLETED" selected>COMPLETED</option>
+                <option value="IN_PROGRESS">IN_PROGRESS</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Remarks / Notes</label>
+              <input type="text" id="taskRemarksInput" class="form-control" placeholder="Optional notes or remarks...">
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" id="submitTaskBtn" class="btn btn-hurix flex-grow-1 py-2">
+              <i class="fa-solid fa-plus-circle me-2"></i>Log Task Entry
+            </button>
+            <button type="button" id="cancelEditTaskBtn" onclick="cancelTaskEdit()" class="btn btn-light border py-2 d-none">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- RIGHT: TODAY'S LOGGED TASKS TABLE -->
+    <div class="col-lg-7">
+      <div class="card card-hurix p-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h5 class="fw-bold mb-0">
+            <i class="fa-solid fa-list-check text-primary me-2"></i>Today's Logged Tasks
+          </h5>
+          <button onclick="reloadUserTasks()" class="btn btn-light btn-sm"><i class="fa-solid fa-rotate me-1"></i>Refresh</button>
+        </div>
+
+        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+          <table class="table table-hurix table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 35px;">#</th>
+                <th style="min-width: 140px;">Client & Project</th>
+                <th style="min-width: 120px;">Activity</th>
+                <th>Hours Worked</th>
+                <th>Units Done</th>
+                <th>Status</th>
+                <th>Remarks</th>
+                <th style="min-width: 85px; text-align: center;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="userTasksTableBody">
+              <tr>
+                <td colspan="8" class="text-center text-muted py-4">No tasks logged for current shift.</td>
+              </tr>
+            </tbody>
+            <tfoot id="userTasksTableFoot" class="table-light fw-bold"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APPLY LEAVE & PERMISSION MODAL -->
+<div class="modal fade" id="leaveModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modal-content-hurix p-3">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-calendar-plus me-2"></i>Apply Leave or Permission</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form onsubmit="handleLeaveSubmit(event)">
+        <div class="modal-body">
+          <div class="alert alert-info py-2 px-3 small mb-3" style="font-size:0.78rem;">
+            <i class="fa-solid fa-circle-info me-1"></i>Select <strong>today</strong>, a <strong>past date</strong> (missing timesheet), or a <strong>future date</strong> to apply for Planned Leave (PL) or Permission.
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Date</label>
+            <input type="date" id="leaveDateInput" class="form-control" required>
+            <div class="form-text" style="font-size:0.72rem;">Supports today, past missing timesheets, or future advance leave dates.</div>
+          </div>
+
+          <!-- CLIENT & PROJECT LEVEL SELECTION ON LEAVE -->
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Client</label>
+              <select id="leaveClientSelect" class="form-select" onchange="onLeaveClientChange()" required>
+                <option value="">-- Select Client --</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">Project</label>
+              <select id="leaveProjectSelect" class="form-select" required>
+                <option value="">-- Select Project --</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Attendance / Leave Category</label>
+            <select id="leaveCategorySelect" class="form-select" onchange="onLeaveCategoryChange()" required>
+              <option value="PL">PL - Planned Leave (Advance / Full Day)</option>
+              <option value="UL">UL - Unplanned Leave</option>
+              <option value="HL">HL - Half Day Leave (4 Hours)</option>
+              <option value="Permission">Permission (Short Out-of-Office)</option>
+              <option value="OD">OD - On Duty</option>
+            </select>
+          </div>
+
+          <div class="mb-3" id="leavePermHrsGroup">
+            <label class="form-label small fw-bold">Permission / Leave Duration (Hours)</label>
+            <input type="number" id="leavePermHrsInput" class="form-control" step="0.5" min="0.5" value="2.0">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold"><i class="fa-solid fa-paperclip me-1"></i>Attach Proof Document (Google Drive Upload - Optional)</label>
+            <input type="file" id="leaveProofFile" class="form-control mb-2" accept="image/*,.pdf,.doc,.docx">
+            <small class="text-muted d-block mb-1">Or paste direct Drive link:</small>
+            <input type="url" id="leaveProofUrl" class="form-control" placeholder="https://drive.google.com/...">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Reason / Remarks</label>
+            <textarea id="leaveRemarksInput" class="form-control" rows="2" placeholder="Brief explanation for leave/permission request..." required></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" id="submitLeaveBtn" class="btn btn-hurix px-4">Submit Application</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- STREAMLINED CLOCK OUT MODAL -->
+<div class="modal fade" id="clockOutModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modal-content-hurix p-3">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold text-danger"><i class="fa-solid fa-stop-circle me-2"></i>Confirm Shift Clock Out</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <!-- SHIFT SUMMARY DISPLAY -->
+        <div class="p-3 bg-light rounded-3 border mb-3">
+          <div class="row align-items-center text-center">
+            <div class="col-4">
+              <small class="text-muted d-block fw-bold" style="font-size:0.7rem;">CLOCK IN</small>
+              <span id="clockOutModalClockIn" class="fw-bold text-primary">--:--</span>
+            </div>
+            <div class="col-4 border-start border-end">
+              <small class="text-muted d-block fw-bold" style="font-size:0.7rem;">CLOCK OUT</small>
+              <span id="clockOutModalClockOut" class="fw-bold text-danger">--:--</span>
+            </div>
+            <div class="col-4">
+              <small class="text-muted d-block fw-bold" style="font-size:0.7rem;">SHIFT DURATION</small>
+              <span id="clockOutModalWorkedHrs" class="fw-bold text-success">0.00 hrs</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-muted small mb-3" style="font-size:0.78rem;">
+          <i class="fa-solid fa-circle-check text-success me-1"></i>Your logged task entries will be finalized for today's shift.
+        </p>
+
+        <!-- OPTIONAL COLLAPSIBLE PERMISSION & PROOF SECTION -->
+        <div class="mb-2">
+          <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 fw-semibold text-secondary"
+            data-bs-toggle="collapse" data-bs-target="#clockOutOptionalFields" aria-expanded="false" style="font-size:0.78rem;">
+            <i class="fa-solid fa-circle-plus me-1 text-primary"></i>Add Permission Hours or Proof Attachment (Optional)
+          </button>
+          <div class="collapse mt-2 p-3 bg-light rounded-3 border" id="clockOutOptionalFields">
+            <div class="mb-3">
+              <label class="form-label small fw-bold">Permission / Out-of-Office Hours</label>
+              <input type="number" id="clockOutPermHrs" class="form-control form-control-sm" step="0.5" min="0" value="0" placeholder="0.0">
+            </div>
+            <div>
+              <label class="form-label small fw-bold"><i class="fa-solid fa-paperclip me-1"></i>Attach Proof Document (Optional)</label>
+              <input type="file" id="clockOutProofFile" class="form-control form-control-sm mb-2" accept="image/*,.pdf,.doc,.docx">
+              <small class="text-muted d-block mb-1" style="font-size:0.72rem;">Or paste Drive link:</small>
+              <input type="url" id="clockOutProofUrl" class="form-control form-control-sm" placeholder="https://drive.google.com/...">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="confirmClockOutBtn" onclick="confirmClockOut()" class="btn btn-danger px-4 fw-bold">
+          <i class="fa-solid fa-stop me-1"></i>Clock Out Shift Now
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

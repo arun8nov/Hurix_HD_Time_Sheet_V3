@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hurix Digital - Attendance & Productivity Hub | Executive Overview</title>
+
+  <!-- Google Fonts & FontAwesome 6 -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --hurix-primary: #0082c8;
+      --hurix-dark: #004b75;
+      --hurix-accent: #00c6ff;
+      --hurix-bg: #f4f7fb;
+      --hurix-text: #1e293b;
+      --card-border: 1px solid #e2e8f0;
+      --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--hurix-bg);
+      color: var(--hurix-text);
+      line-height: 1.6;
+      padding-bottom: 3rem;
+    }
+
+    .report-paper {
+      max-width: 1000px;
+      margin: 2rem auto;
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+      padding: 3rem;
+      border: var(--card-border);
+    }
+
+    .report-header {
+      border-bottom: 3px solid var(--hurix-primary);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .brand-title {
+      color: var(--hurix-dark);
+      font-weight: 800;
+      font-size: 1.8rem;
+      letter-spacing: -0.5px;
+    }
+
+    .report-badge {
+      background: linear-gradient(135deg, #0082c8 0%, #004b75 100%);
+      color: #ffffff;
+      padding: 0.4rem 1rem;
+      border-radius: 30px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .section-card {
+      background: #ffffff;
+      border: var(--card-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      margin-bottom: 1.75rem;
+      box-shadow: var(--card-shadow);
+    }
+
+    .section-title {
+      color: var(--hurix-dark);
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+    }
+
+    .section-title i {
+      color: var(--hurix-primary);
+      margin-right: 0.6rem;
+    }
+
+    .metric-card {
+      background: #f8fafc;
+      border-left: 4px solid var(--hurix-primary);
+      border-radius: 10px;
+      padding: 1rem;
+      height: 100%;
+    }
+
+    .metric-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 0.25rem;
+    }
+
+    .metric-desc {
+      font-size: 0.85rem;
+      color: #334155;
+      margin: 0;
+    }
+
+    .formula-box {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: monospace;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+
+    .hierarchy-pill {
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 0.4rem 0.85rem;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .roadmap-badge {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #15803d;
+      border-radius: 12px;
+      padding: 1rem;
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+
+      .report-paper {
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+        border: none;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Floating Print Control (No Print) -->
+  <div class="no-print text-center py-3">
+    <button onclick="window.print()" class="btn btn-primary fw-bold px-4 rounded-pill shadow">
+      <i class="fa-solid fa-print me-2"></i>Print / Save as Executive PDF
+    </button>
+  </div>
+
+  <div class="report-paper">
+
+    <!-- Header Section -->
+    <div class="report-header d-flex align-items-center justify-content-between">
+      <div>
+        <div class="d-flex align-items-center mb-1">
+          <span class="brand-title me-3">Hurix Digital</span>
+          <span class="report-badge">Executive Briefing & Architecture Report</span>
+        </div>
+        <h4 class="fw-bold text-secondary mb-0">Attendance & Productivity Hub</h4>
+      </div>
+      <div class="text-end">
+        <span class="badge bg-light text-dark border px-3 py-2">
+          <i class="fa-solid fa-building me-1 text-primary"></i>Operational Scope: 80+ Employees
+        </span>
+        <small class="d-block text-muted mt-1">Enterprise Operations & NetSuite-Style Time Tracking</small>
+      </div>
+    </div>
+
+    <!-- 1. Executive Summary & Scope -->
+    <div class="section-card">
+      <h5 class="section-title"><i class="fa-solid fa-compass"></i>1. Executive Summary & Scope</h5>
+      <p class="mb-2">
+        The <strong>Hurix Digital Attendance & Productivity Hub</strong> is a custom operational time tracking system built for <strong>80+ team members</strong> across operations (<em>Annotation, SME, XML Conversion, and Floor Management</em>).
+      </p>
+      <p class="mb-0">
+        <strong>Core Scope:</strong> The platform delivers a robust, <strong>NetSuite-style time tracking structure</strong> natively inside Google Workspace, capturing shift clock-ins/outs, break pauses, task activity counts, and handling times tailored to Hurix Digital's operational workflows.
+      </p>
+    </div>
+
+    <!-- 2. Strategic Objectives (Why This Tool) -->
+    <div class="section-card">
+      <h5 class="section-title"><i class="fa-solid fa-bullseye"></i>2. Strategic Objectives (Why This Tool)</h5>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="p-3 bg-light rounded-3 border h-100">
+            <h6 class="fw-bold text-primary mb-1"><i class="fa-solid fa-layer-group me-1"></i>NetSuite-Style Tracking</h6>
+            <p class="small text-muted mb-0">Provides enterprise-grade, NetSuite-like task breakdown and time allocation directly at the ground operational level.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 bg-light rounded-3 border h-100">
+            <h6 class="fw-bold text-success mb-1"><i class="fa-solid fa-list-check me-1"></i>Task-Level Precision</h6>
+            <p class="small text-muted mb-0">Captures unit counts, handling speeds (AHT), and active timestamps that standard high-level attendance tools cannot log.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="p-3 bg-light rounded-3 border h-100">
+            <h6 class="fw-bold text-info mb-1"><i class="fa-solid fa-eye me-1"></i>Live Operations Control</h6>
+            <p class="small text-muted mb-0">Provides real-time visibility into team capacity, shift states, break durations, and production bottlenecks.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. How Billable & Non-Billable Tracking Works -->
+    <div class="section-card">
+      <h5 class="section-title"><i class="fa-solid fa-scale-balanced"></i>3. Billable & Non-Billable Activity Mechanics</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="p-3 border border-primary-subtle rounded-3 bg-primary-subtle bg-opacity-10 h-100">
+            <h6 class="fw-bold text-primary"><i class="fa-solid fa-briefcase me-2"></i>Billable Client Production</h6>
+            <p class="small text-dark mb-1">Direct revenue-generating client work (e.g. <em>iMerit, Innodata, Snorkel</em>).</p>
+            <ul class="small text-muted ps-3 mb-0">
+              <li>Credited with <strong>Earned Productive Hours</strong> based on approved AHT benchmarks.</li>
+              <li>Feeds client billing metrics and resource utilization ratios.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="p-3 border border-secondary-subtle rounded-3 bg-secondary-subtle bg-opacity-10 h-100">
+            <h6 class="fw-bold text-secondary"><i class="fa-solid fa-building-user me-2"></i>Non-Billable Internal Activities</h6>
+            <p class="small text-dark mb-1">Internal processes (e.g. <em>Internal Training, Floor Management, Upskilling</em>).</p>
+            <ul class="small text-muted ps-3 mb-0">
+              <li>Tracked accurately for attendance and payroll without inflating billable client hours.</li>
+              <li>Keeps client metrics clean while recording legitimate operational effort.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Key Operational Metrics Explained -->
+    <div class="section-card">
+      <h5 class="section-title"><i class="fa-solid fa-calculator"></i>4. Operational Metric Framework (Key Definitions)</h5>
+      
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div class="metric-card" style="border-left-color: #0284c7;">
+            <div class="metric-title">Net Worked (Shift Hours)</div>
+            <p class="metric-desc">Net shift active time (Clock-In to Clock-Out minus Breaks). Strictly excludes full-day leaves (0.00 hrs) and future dates.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="metric-card" style="border-left-color: #0d9488;">
+            <div class="metric-title">Gross Worked (Task Log Hours)</div>
+            <p class="metric-desc">Total elapsed time spent actively logging and executing specific production tasks during the shift.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="metric-card" style="border-left-color: #10b981;">
+            <div class="metric-title">Earned Productive Hours</div>
+            <p class="metric-desc">Target output credit earned based on completed units and standard AHT benchmarks.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div class="metric-card" style="border-left-color: #ef4444;">
+            <div class="metric-title">Performance Leakage Hours</div>
+            <p class="metric-desc">Net variance between actual task hours and earned output minus client blockers: <code>Max(0, Task - Earned - Blocked)</code>.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="metric-card" style="border-left-color: #f59e0b;">
+            <div class="metric-title">Idle Downtime Hours</div>
+            <p class="metric-desc">Unproductive floor waiting time caused by task allocation lag or internal technical delays.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="metric-card" style="border-left-color: #7e22ce;">
+            <div class="metric-title">Blocked Hours</div>
+            <p class="metric-desc">Task execution time hindered by external client blockers, platform outages, or query waits.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="metric-card" style="border-left-color: #64748b;">
+            <div class="metric-title">Bench & Upskilling Hours</div>
+            <p class="metric-desc">Training, practice, and bench reserve capacity when staff are present but unassigned to billable client production.</p>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="metric-card" style="border-left-color: #ea580c;">
+            <div class="metric-title">Total Break Duration</div>
+            <p class="metric-desc">Cumulative shift pause duration logged precisely via live countdown break timers.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="formula-box text-center">
+        Earned Hours = (Units × AHT Mins) / 60 &nbsp;|&nbsp; Performance Leakage = Max(0, Task Actual - Earned - Blocked) &nbsp;|&nbsp; Speed % = (Earned / Task Actual) × 100
+      </div>
+    </div>
+
+    <!-- 5. Client, Project & Activity Tracking & Management Insights -->
+    <div class="section-card">
+      <h5 class="section-title"><i class="fa-solid fa-sitemap"></i>5. Hierarchy Tracking & Business Insights</h5>
+      
+      <div class="text-center mb-3">
+        <span class="hierarchy-pill me-2"><i class="fa-solid fa-building me-1"></i>Client Name</span>
+        <i class="fa-solid fa-arrow-right text-muted me-2"></i>
+        <span class="hierarchy-pill me-2"><i class="fa-solid fa-folder me-1"></i>Project Name</span>
+        <i class="fa-solid fa-arrow-right text-muted me-2"></i>
+        <span class="hierarchy-pill"><i class="fa-solid fa-sliders me-1"></i>Activity Type + AHT Benchmark</span>
+      </div>
+
+      <h6 class="fw-bold text-dark mb-2">What Management Obtains From This Tracking:</h6>
+      <ul class="small text-muted mb-0">
+        <li class="mb-1"><strong>Client Profitability & Margin Visibility:</strong> Compare billable worked hours vs earned output across all client accounts.</li>
+        <li class="mb-1"><strong>AHT Benchmark Calibration:</strong> Evaluate whether target handling times are realistic or require calibration for new workflows.</li>
+        <li><strong>Cross-Department Capacity Planning:</strong> Monitor staffing distribution across Annotation, SME, and XML divisions in real-time.</li>
+      </ul>
+    </div>
+
+    <!-- 6. Real-Time Shift Monitoring & Executive Dashboards -->
+    <div class="section-card">
+      <h5 class="section-title"><i class="fa-solid fa-chart-line"></i>6. Real-Time Oversight & Executive Analytics</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="p-3 bg-light rounded-3 border h-100">
+            <h6 class="fw-bold text-primary"><i class="fa-solid fa-desktop me-2"></i>Real-Time Shift Monitor (Manager View)</h6>
+            <p class="small text-muted mb-0">Live audit table showing real-time employee states (<em>Shift Open, On Break, On Leave, Pending Clock-In</em>), break inspectors, and team shrinkage rate.</p>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="p-3 bg-light rounded-3 border h-100">
+            <h6 class="fw-bold text-info"><i class="fa-solid fa-chart-pie me-2"></i>Executive Analytics Summary (Leadership View)</h6>
+            <p class="small text-muted mb-0">Cross-tab aggregate reporting filtered by <strong>Month, Week, Date Range, Team, or Client</strong> with Resource Utilization % and Speed Efficiency %.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Future Roadmap & Advanced Features -->
+    <div class="section-card">
+      <h5 class="section-title"><i class="fa-solid fa-rocket"></i>7. Future Development & Advanced Roadmap</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="roadmap-badge h-100">
+            <h6 class="fw-bold text-success"><i class="fa-solid fa-file-export me-2"></i>1. Automated Advanced Report Generator</h6>
+            <p class="small mb-0">Development of automated PDF report generation, scheduled email executive digests, and deep historical trend auditing engines.</p>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="roadmap-badge h-100" style="background: #eff6ff; border-color: #bfdbfe; color: #1e40af;">
+            <h6 class="fw-bold text-primary"><i class="fa-solid fa-chart-column me-2"></i>2. Historical Benchmark Audit Engine</h6>
+            <p class="small mb-0">Multi-month comparative analytics engine to track long-term team efficiency, shrinkage trends, and automatic AHT recalibration alerts.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Document Footer -->
+    <div class="text-center text-muted small pt-3 border-top">
+      Hurix Digital Operations & Architecture Report &nbsp;|&nbsp; Hurix Attendance & Productivity Hub v2.0
+    </div>
+
+  </div>
+
+</body>
+
+</html>
