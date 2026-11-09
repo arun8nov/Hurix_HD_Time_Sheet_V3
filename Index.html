@@ -145,6 +145,63 @@
       color: #0f172a;
     }
 
+    /* COMPACT SINGLE-ROW KPI CARDS */
+    .kpi-row-compact {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      align-items: stretch !important;
+      gap: 0.5rem !important;
+      overflow-x: auto !important;
+      width: 100% !important;
+      padding-bottom: 0.35rem !important;
+      margin-bottom: 1.25rem !important;
+      scrollbar-width: thin !important;
+    }
+    .kpi-card-compact {
+      flex: 1 1 0% !important;
+      min-width: 110px !important;
+      max-width: 100% !important;
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 10px !important;
+      padding: 0.45rem 0.6rem !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+      transition: all 0.2s ease !important;
+      position: relative !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+    }
+    .kpi-card-compact:hover {
+      transform: translateY(-2px) !important;
+      box-shadow: 0 4px 10px rgba(0, 130, 200, 0.12) !important;
+    }
+    .kpi-card-compact .kpi-label {
+      font-size: 0.68rem !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+      color: #64748b !important;
+      letter-spacing: 0.3px !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+    .kpi-card-compact .kpi-value {
+      font-size: 1.15rem !important;
+      font-weight: 800 !important;
+      line-height: 1.15 !important;
+      margin: 0.15rem 0 !important;
+      white-space: nowrap !important;
+    }
+    .kpi-card-compact .kpi-sub {
+      font-size: 0.64rem !important;
+      color: #64748b !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+
     .table-hurix {
       background: #ffffff;
       border-radius: 12px;
@@ -198,10 +255,12 @@
       body * {
         visibility: hidden;
       }
+
       #eodReportModal,
       #eodReportModal * {
         visibility: visible;
       }
+
       #eodReportModal {
         position: absolute;
         left: 0;
@@ -210,16 +269,19 @@
         margin: 0;
         padding: 0;
       }
+
       .modal-header button,
       .modal-footer,
       #eodFormattedTextPreview,
       .mt-3:has(#eodFormattedTextPreview) {
         display: none !important;
       }
+
       .modal-dialog {
         max-width: 100% !important;
         margin: 0 !important;
       }
+
       .modal-content {
         border: none !important;
         box-shadow: none !important;
@@ -272,12 +334,25 @@
           </div>
         </div>
 
-        <div class="mb-4">
+        <div class="mb-3">
           <label class="form-label small fw-bold">Password</label>
           <div class="input-group">
             <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-lock text-muted"></i></span>
             <input type="password" id="userPassword" class="form-control border-start-0" placeholder="••••••••"
               required>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label small fw-bold">Select Today's Shift <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-business-time text-muted"></i></span>
+            <select id="userLoginShiftSelect" class="form-select border-start-0" required>
+              <option value="General" selected>General Shift (8 hrs)</option>
+              <option value="1st">1st Shift (7 hrs)</option>
+              <option value="Afternoon">Afternoon Shift (7 hrs)</option>
+              <option value="2nd">2nd Shift (7 hrs)</option>
+            </select>
           </div>
         </div>
 
@@ -438,6 +513,7 @@
       e.preventDefault();
       var email = document.getElementById('userEmail').value;
       var password = document.getElementById('userPassword').value;
+      var shiftChoice = document.getElementById('userLoginShiftSelect') ? document.getElementById('userLoginShiftSelect').value : 'General';
       var alertBox = document.getElementById('loginAlert');
       var loginBtn = document.getElementById('loginBtn');
 
@@ -453,9 +529,17 @@
 
             if (res && res.success) {
               currentUser = res.user;
-              activeShiftState = res.activeShift;
+              activeShiftState = res.activeShift || { shift_type: shiftChoice, total_break_minutes: 60 };
+              activeShiftState.shift_type = activeShiftState.shift_type || shiftChoice;
               clientMasterData = res.clientMaster || [];
               localStorage.setItem('hurix_user', JSON.stringify(currentUser));
+
+              google.script.run.saveUserTodayShift({
+                emp_id: currentUser.emp_id,
+                email: currentUser.email,
+                shift_type: shiftChoice
+              });
+
               loadDashboard(currentUser);
             } else {
               alertBox.textContent = res ? res.message : 'Invalid email or password.';
@@ -471,7 +555,8 @@
           .authenticateUserWithPassword(email, password);
       } else {
         loginBtn.disabled = false;
-        currentUser = { emp_id: 'CC1778', emp_name: 'Arunprakash B', email: email, app_role: 'Admin', team: 'Annotation' };
+        currentUser = { emp_id: 'CC1778', emp_name: 'Arunprakash B', email: email, app_role: 'Admin', team: 'Annotation', default_shift: shiftChoice };
+        activeShiftState = { shift_type: shiftChoice, total_break_minutes: 60 };
         localStorage.setItem('hurix_user', JSON.stringify(currentUser));
         loadDashboard(currentUser);
       }
@@ -527,6 +612,13 @@
             syncUserShiftUI();
             reloadUserTasks();
             checkMissingTimesheetBanner(user);
+
+            // Require employees to select shift if not chosen yet for today
+            if (!isAdmin && (!shift || !shift.shift_type || shift.shift_status === 'NOT_CLOCKED_IN')) {
+              setTimeout(function () {
+                openShiftSelectionModal();
+              }, 400);
+            }
           })
           .withFailureHandler(function () {
             syncUserShiftUI();
@@ -537,6 +629,95 @@
       } else if (!isMgmtAdmin) {
         syncUserShiftUI();
         reloadUserTasks();
+        if (!isAdmin && (!activeShiftState || !activeShiftState.shift_type)) {
+          setTimeout(function () {
+            openShiftSelectionModal();
+          }, 400);
+        }
+      }
+    }
+
+    // MANDATORY SHIFT SELECTION MODAL HANDLERS
+    function openShiftSelectionModal() {
+      var currentShift = (activeShiftState && activeShiftState.shift_type) || (currentUser && currentUser.default_shift) || 'General';
+      var radios = document.getElementsByName('shiftRadioChoice');
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].value.toLowerCase() === currentShift.toLowerCase()) {
+          radios[i].checked = true;
+        }
+      }
+      var modalElem = document.getElementById('selectShiftModal');
+      if (modalElem) {
+        var modal = bootstrap.Modal.getOrCreateInstance(modalElem);
+        modal.show();
+      }
+    }
+
+    function saveUserSelectedShift() {
+      var chosenShift = 'General';
+      var radios = document.getElementsByName('shiftRadioChoice');
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].checked) {
+          chosenShift = radios[i].value;
+          break;
+        }
+      }
+
+      if (!activeShiftState) {
+        activeShiftState = { shift_type: chosenShift, total_break_minutes: 60 };
+      } else {
+        activeShiftState.shift_type = chosenShift;
+      }
+
+      var stdHrs = (chosenShift === 'General') ? 8 : 7;
+      var badgeText = document.getElementById('userShiftBadgeText');
+      if (badgeText) badgeText.textContent = chosenShift + ' (' + stdHrs + 'h)';
+
+      var btn = document.getElementById('confirmShiftSelectBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving Shift...';
+      }
+
+      if (typeof google !== 'undefined' && google.script && google.script.run && currentUser) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Confirm Shift & Proceed';
+            }
+            var modalElem = document.getElementById('selectShiftModal');
+            if (modalElem) {
+              var modal = bootstrap.Modal.getInstance(modalElem);
+              if (modal) modal.hide();
+            }
+          })
+          .withFailureHandler(function (err) {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Confirm Shift & Proceed';
+            }
+            var modalElem = document.getElementById('selectShiftModal');
+            if (modalElem) {
+              var modal = bootstrap.Modal.getInstance(modalElem);
+              if (modal) modal.hide();
+            }
+          })
+          .saveUserTodayShift({
+            emp_id: currentUser.emp_id,
+            email: currentUser.email,
+            shift_type: chosenShift
+          });
+      } else {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-check me-2"></i>Confirm Shift & Proceed';
+        }
+        var modalElem = document.getElementById('selectShiftModal');
+        if (modalElem) {
+          var modal = bootstrap.Modal.getInstance(modalElem);
+          if (modal) modal.hide();
+        }
       }
     }
 
@@ -609,6 +790,11 @@
       if (outElem) outElem.textContent = outDisplay;
       if (inTextElem) inTextElem.textContent = inDisplay;
       if (outTextElem) outTextElem.textContent = outDisplay;
+
+      var currentShift = (activeShiftState && activeShiftState.shift_type) || (currentUser && currentUser.default_shift) || 'General';
+      var stdHrs = (currentShift === 'General') ? 8 : 7;
+      var shiftBadgeText = document.getElementById('userShiftBadgeText');
+      if (shiftBadgeText) shiftBadgeText.textContent = currentShift + ' (' + stdHrs + 'h)';
 
       if (!activeShiftState || activeShiftState.shift_status === 'CLOSED' || activeShiftState.shift_status === 'LEAVE_CLOSED') {
         var isClosed = activeShiftState && (activeShiftState.shift_status === 'CLOSED' || activeShiftState.shift_status === 'LEAVE_CLOSED');
@@ -720,7 +906,13 @@
     // Shift Handlers
     function handleClockIn() {
       if (!currentUser) return;
-      var payload = { emp_id: currentUser.emp_id, emp_name: currentUser.emp_name, email: currentUser.email };
+      var shiftChoice = (activeShiftState && activeShiftState.shift_type) || (currentUser && currentUser.default_shift) || 'General';
+      var payload = {
+        emp_id: currentUser.emp_id,
+        emp_name: currentUser.emp_name,
+        email: currentUser.email,
+        shift_type: shiftChoice
+      };
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
@@ -730,6 +922,7 @@
                 log_id: res.log_id,
                 shift_start_time: res.shift_start_time,
                 shift_status: 'OPEN',
+                shift_type: res.shift_type || shiftChoice,
                 total_break_minutes: 60,
                 total_shift_hours: 0
               };
@@ -743,7 +936,13 @@
           })
           .clockInUser(payload);
       } else {
-        activeShiftState = { log_id: 'ATT-LOCAL-1', shift_start_time: new Date().toTimeString().substring(0, 8), shift_status: 'OPEN', total_break_minutes: 60 };
+        activeShiftState = {
+          log_id: 'ATT-LOCAL-1',
+          shift_start_time: new Date().toTimeString().substring(0, 8),
+          shift_status: 'OPEN',
+          shift_type: shiftChoice,
+          total_break_minutes: 60
+        };
         syncUserShiftUI();
       }
     }
@@ -1142,31 +1341,6 @@
       onAdminClientChange();
     }
 
-    function onAdminClientChange() {
-      var clientSelect = document.getElementById('adminFilterClient');
-      var projSelect = document.getElementById('adminFilterProject');
-      if (!clientSelect || !projSelect) return;
-
-      var selectedClient = clientSelect.value || 'ALL';
-      var currentProj = projSelect.value || 'ALL';
-
-      projSelect.innerHTML = '<option value="ALL">All Projects</option>';
-      var projects = clientMasterData.filter(c => selectedClient === 'ALL' || c.client_name === selectedClient);
-      var uniqueProjs = [...new Set(projects.map(p => p.project_name))].sort();
-      uniqueProjs.forEach(function (p) {
-        var opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = p;
-        projSelect.appendChild(opt);
-      });
-      if (uniqueProjs.indexOf(currentProj) !== -1) {
-        projSelect.value = currentProj;
-      } else {
-        projSelect.value = 'ALL';
-      }
-      loadAdminDashboardData();
-    }
-
     function onLeaveClientChange() {
       var clientName = document.getElementById('leaveClientSelect').value;
       var projSelect = document.getElementById('leaveProjectSelect');
@@ -1203,19 +1377,7 @@
     }
 
     function onProjectChange() {
-      var clientName = document.getElementById('taskClientSelect').value;
-      var projName = document.getElementById('taskProjectSelect').value;
-
-      var ahtInput = document.getElementById('taskAhtInput');
-      if (ahtInput) {
-        if (String(projName || '').trim().toUpperCase() === 'LLM') {
-          ahtInput.readOnly = false;
-          ahtInput.removeAttribute('readonly');
-        } else {
-          ahtInput.readOnly = true;
-          ahtInput.setAttribute('readonly', 'readonly');
-        }
-      }
+      // Project selection hook
     }
 
     // Task Logging Submission & Editing
@@ -1228,20 +1390,15 @@
 
       var client = document.getElementById('taskClientSelect').value;
       var project = document.getElementById('taskProjectSelect').value;
+      var activityElem = document.getElementById('taskActivitySelect');
+      var activityType = activityElem ? activityElem.value : 'Production';
       var hoursWorked = Number(document.getElementById('taskHoursWorkedInput').value) || 0;
-      var count = Number(document.getElementById('taskCountInput').value) || 0;
-      var status = document.getElementById('taskStatusSelect').value;
-      var remarks = document.getElementById('taskRemarksInput').value;
+      var remarks = document.getElementById('taskRemarksInput') ? document.getElementById('taskRemarksInput').value : '';
 
       if (hoursWorked <= 0) {
         alert('Please enter valid hours worked (e.g. 1.5).');
         return;
       }
-
-      var foundProj = clientMasterData.find(c => c.client_name === client && c.project_name === project);
-      var activityType = foundProj ? (foundProj.activity_type || 'Production Work') : 'Production Work';
-      var isBillable = foundProj ? foundProj.is_billable : true;
-      var aht = foundProj ? (foundProj.aht_minutes || 60) : 60;
 
       var now = new Date();
       var startMs = now.getTime() - (hoursWorked * 60 * 60 * 1000);
@@ -1255,24 +1412,24 @@
         active_client: client,
         active_project: project,
         activity_type: activityType,
-        aht_benchmark_mins: aht,
-        task_count: count,
         actual_worked_hours: hoursWorked,
+        hours_worked: hoursWorked,
         work_start_time: startTimeObj.toISOString(),
         work_end_time: now.toISOString(),
-        task_status: status,
-        user_remarks: remarks,
-        is_billable: isBillable
+        task_status: 'COMPLETED',
+        user_remarks: remarks
       };
 
       var btn = document.getElementById('submitTaskBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving Task...';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Saving Work Log...';
+      }
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(function (res) {
-            btn.disabled = false;
+            if (btn) btn.disabled = false;
             cancelTaskEdit();
             if (res && res.success) {
               reloadUserTasks();
@@ -1280,16 +1437,16 @@
                 loadAdminDashboardData();
               }
             } else if (res && res.message) {
-              alert('Error saving task: ' + res.message);
+              alert('Error saving work log: ' + res.message);
             }
           })
           .withFailureHandler(function (err) {
-            btn.disabled = false;
-            alert('Server error while saving task: ' + (err ? err.toString() : 'Unknown error'));
+            if (btn) btn.disabled = false;
+            alert('Server error while saving work log: ' + (err ? err.toString() : 'Unknown error'));
           })
           .logTaskEntry(payload);
       } else {
-        btn.disabled = false;
+        if (btn) btn.disabled = false;
         if (editingTaskLogId) {
           var idx = userTasksCache.findIndex(function (t) { return t.task_log_id === editingTaskLogId; });
           if (idx !== -1) {
@@ -1298,11 +1455,8 @@
               active_client: client,
               active_project: project,
               activity_type: activityType,
-              task_count: count,
               actual_worked_hours: hoursWorked,
-              task_status: status,
-              user_remarks: remarks,
-              productive_hours: (count * aht) / 60
+              user_remarks: remarks
             };
           }
         } else {
@@ -1311,11 +1465,8 @@
             active_client: client,
             active_project: project,
             activity_type: activityType,
-            task_count: count,
             actual_worked_hours: hoursWorked,
-            task_status: status,
-            user_remarks: remarks,
-            productive_hours: (count * aht) / 60
+            user_remarks: remarks
           });
         }
         cancelTaskEdit();
@@ -1338,25 +1489,20 @@
       var projSel = document.getElementById('taskProjectSelect');
       if (projSel) {
         projSel.value = t.active_project || '';
-        onProjectChange();
       }
-
-
+      var actSel = document.getElementById('taskActivitySelect');
+      if (actSel) {
+        actSel.value = t.activity_type || 'Production';
+      }
       if (document.getElementById('taskHoursWorkedInput')) {
         document.getElementById('taskHoursWorkedInput').value = t.actual_worked_hours || '';
-      }
-      if (document.getElementById('taskCountInput')) {
-        document.getElementById('taskCountInput').value = t.task_count || 0;
-      }
-      if (document.getElementById('taskStatusSelect')) {
-        document.getElementById('taskStatusSelect').value = t.task_status || 'COMPLETED';
       }
       if (document.getElementById('taskRemarksInput')) {
         document.getElementById('taskRemarksInput').value = t.user_remarks || '';
       }
 
       var submitBtn = document.getElementById('submitTaskBtn');
-      if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk me-2"></i>Update Task Entry';
+      if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-floppy-disk me-2"></i>Update Work Log';
 
       var cancelBtn = document.getElementById('cancelEditTaskBtn');
       if (cancelBtn) cancelBtn.classList.remove('d-none');
@@ -1371,7 +1517,7 @@
       if (formElem) formElem.reset();
 
       var submitBtn = document.getElementById('submitTaskBtn');
-      if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-plus-circle me-2"></i>Log Task Entry';
+      if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-plus-circle me-2"></i>Log Work Entry';
 
       var cancelBtn = document.getElementById('cancelEditTaskBtn');
       if (cancelBtn) cancelBtn.classList.add('d-none');
@@ -1385,7 +1531,6 @@
           var projSelect = document.getElementById('taskProjectSelect');
           if (projSelect && currentUser.project_name) {
             projSelect.value = currentUser.project_name;
-            onProjectChange();
           }
         }
       }
@@ -1430,7 +1575,7 @@
           .getUserTodayTasks(currentUser.emp_id, activeShiftState ? activeShiftState.log_id : '');
       } else {
         renderUserTasks([
-          { task_log_id: 'TASK-1001', active_client: 'iMerit', active_project: 'Pravah', activity_type: 'Production Work', task_count: 15, actual_worked_hours: 2.5, task_status: 'COMPLETED', user_remarks: 'Completed 15 items' }
+          { task_log_id: 'TASK-1001', active_client: 'iMerit', active_project: 'Pravah', activity_type: 'Production', actual_worked_hours: 2.5, user_remarks: 'Completed 15 items' }
         ]);
       }
     }
@@ -1444,35 +1589,38 @@
       if (tfoot) tfoot.innerHTML = '';
 
       if (!tasks || tasks.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No tasks logged for current shift.</td></tr>';
-        if (document.getElementById('userTotalTasksLogged')) document.getElementById('userTotalTasksLogged').textContent = '0';
-        if (document.getElementById('userTotalUnitsCompleted')) document.getElementById('userTotalUnitsCompleted').textContent = '0';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No work logs recorded for current shift.</td></tr>';
+        if (document.getElementById('userTotalHoursLogged')) document.getElementById('userTotalHoursLogged').textContent = '0.00h';
         return;
       }
 
-      var totalUnits = 0;
       var totalWorkedHrs = 0;
 
       tasks.forEach(function (t, idx) {
-        var units = Number(t.task_count) || 0;
         var workedHrs = Number(t.actual_worked_hours) || 0;
-        totalUnits += units;
         totalWorkedHrs += workedHrs;
 
-        var statusClass = t.task_status === 'COMPLETED' ? 'bg-success' : 'bg-warning text-dark';
+        var act = t.activity_type || 'Production';
+        var badgeColor = 'bg-primary-subtle text-primary border border-primary-subtle';
+        if (act === 'Production') badgeColor = 'bg-success-subtle text-success border border-success-subtle';
+        else if (act === 'Client Meeting') badgeColor = 'bg-info-subtle text-info border border-info-subtle';
+        else if (act === 'Internal Meeting') badgeColor = 'bg-primary-subtle text-primary border border-primary-subtle';
+        else if (act === 'Training (Material Go-Through)') badgeColor = 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+        else if (act === 'Idle') badgeColor = 'bg-secondary-subtle text-secondary border border-secondary-subtle';
+        else if (act === 'Down Time') badgeColor = 'bg-danger-subtle text-danger border border-danger-subtle';
+
         var remarksText = t.user_remarks ? t.user_remarks : '<span class="text-muted">--</span>';
 
         var tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="text-center fw-bold text-muted">${idx + 1}</td>
           <td>
-            <div class="fw-bold text-dark">${t.active_client || 'N/A'}</div>
-            <small class="text-muted">${t.active_project || 'N/A'}</small>
+            <div class="fw-bold text-dark">${t.active_client || 'General'}</div>
+            <small class="text-muted">${t.active_project || 'Standard'}</small>
           </td>
+          <td><span class="badge ${badgeColor}">${act}</span></td>
           <td class="fw-bold text-primary">${workedHrs.toFixed(2)} hrs</td>
-          <td class="fw-bold text-success">${units}</td>
-          <td><span class="badge ${statusClass}">${t.task_status || 'COMPLETED'}</span></td>
-          <td class="small text-muted" style="max-width: 200px;">${remarksText}</td>
+          <td class="small text-muted" style="max-width: 250px;">${remarksText}</td>
           <td class="text-center">
             <button onclick="editUserTask('${t.task_log_id}')" class="btn btn-outline-primary btn-sm py-0 px-2 me-1" title="Edit Entry"><i class="fa-solid fa-pen"></i></button>
             <button onclick="deleteUserTask('${t.task_log_id}')" class="btn btn-outline-danger btn-sm py-0 px-2" title="Delete Entry"><i class="fa-solid fa-trash"></i></button>
@@ -1481,20 +1629,16 @@
         tbody.appendChild(tr);
       });
 
-      if (document.getElementById('userTotalTasksLogged')) {
-        document.getElementById('userTotalTasksLogged').textContent = tasks.length;
-      }
-      if (document.getElementById('userTotalUnitsCompleted')) {
-        document.getElementById('userTotalUnitsCompleted').textContent = totalUnits;
+      if (document.getElementById('userTotalHoursLogged')) {
+        document.getElementById('userTotalHoursLogged').textContent = totalWorkedHrs.toFixed(2) + 'h';
       }
 
       if (tfoot) {
         tfoot.innerHTML = `
           <tr class="table-light fw-bold">
-            <td colspan="2" class="text-uppercase text-dark text-end">TOTALS:</td>
+            <td colspan="3" class="text-uppercase text-dark text-end">TOTAL WORK LOGGED:</td>
             <td class="text-primary">${totalWorkedHrs.toFixed(2)} hrs</td>
-            <td class="text-success">${totalUnits}</td>
-            <td colspan="3"></td>
+            <td colspan="2"></td>
           </tr>
         `;
       }
@@ -1580,6 +1724,99 @@
       }
     });
 
+    var adminPeriod = 'day'; // 'day' | 'week' | 'month'
+
+    function setAdminPeriod(p) {
+      adminPeriod = p;
+      ['day', 'week', 'month'].forEach(function (mode) {
+        var btn = document.getElementById('periodBtn-' + mode);
+        if (btn) {
+          if (mode === p) {
+            btn.className = 'btn btn-sm btn-hurix fw-semibold active';
+          } else {
+            btn.className = 'btn btn-sm btn-outline-secondary fw-semibold';
+          }
+        }
+      });
+      loadAdminDashboardData();
+    }
+
+    function navigateAdminDate(delta) {
+      var dateInput = document.getElementById('adminFilterDate');
+      var curVal = dateInput && dateInput.value ? dateInput.value : new Date().toISOString().substring(0, 10);
+      var parts = curVal.split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      var d = parseInt(parts[2], 10);
+      var dt = new Date(y, m, d);
+
+      if (adminPeriod === 'month') {
+        dt.setMonth(dt.getMonth() + delta);
+      } else if (adminPeriod === 'week') {
+        dt.setDate(dt.getDate() + (delta * 7));
+      } else {
+        dt.setDate(dt.getDate() + delta);
+      }
+
+      var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+      var newDateStr = dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
+      if (dateInput) dateInput.value = newDateStr;
+      loadAdminDashboardData();
+    }
+
+    function setAdminDateToday() {
+      var dateInput = document.getElementById('adminFilterDate');
+      if (dateInput) dateInput.value = new Date().toISOString().substring(0, 10);
+      loadAdminDashboardData();
+    }
+
+    function onAdminClientChange() {
+      var clientSelect = document.getElementById('adminFilterClient');
+      var projSelect = document.getElementById('adminFilterProject');
+      if (!projSelect) return;
+
+      var clientVal = clientSelect ? (clientSelect.value || 'ALL').trim() : 'ALL';
+      var currentProj = projSelect.value || 'ALL';
+
+      projSelect.innerHTML = '<option value="ALL">All Projects</option>';
+      if (clientMasterData && clientMasterData.length > 0) {
+        var projects = [];
+        clientMasterData.forEach(function (cp) {
+          if (clientVal === 'ALL' || String(cp.client_name || '').toUpperCase() === clientVal.toUpperCase()) {
+            if (cp.project_name && projects.indexOf(cp.project_name) === -1) {
+              projects.push(cp.project_name);
+            }
+          }
+        });
+        projects.sort().forEach(function (p) {
+          var opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p;
+          projSelect.appendChild(opt);
+        });
+        if (projects.indexOf(currentProj) !== -1) {
+          projSelect.value = currentProj;
+        } else {
+          projSelect.value = 'ALL';
+        }
+      }
+      loadAdminDashboardData();
+    }
+
+    function filterAdminStaffTable() {
+      var query = document.getElementById('adminSearchInput') ? document.getElementById('adminSearchInput').value.toLowerCase().trim() : '';
+      var rows = document.querySelectorAll('#adminStaffTableBody tr');
+      rows.forEach(function (r) {
+        if (r.querySelector('td[colspan]')) return;
+        var text = r.textContent.toLowerCase();
+        if (!query || text.indexOf(query) !== -1) {
+          r.style.display = '';
+        } else {
+          r.style.display = 'none';
+        }
+      });
+    }
+
     function loadAdminDashboardData(isSilent) {
       var dateElem = document.getElementById('adminFilterDate');
       var dateVal = dateElem ? dateElem.value : '';
@@ -1591,13 +1828,34 @@
       var clientVal = clientElem ? clientElem.value : 'ALL';
       var projElem = document.getElementById('adminFilterProject');
       var projVal = projElem ? projElem.value : 'ALL';
+      var teamElem = document.getElementById('adminFilterTeam');
+      var teamVal = teamElem ? teamElem.value : 'ALL';
+      var shiftElem = document.getElementById('adminFilterShift');
+      var shiftVal = shiftElem ? shiftElem.value : 'ALL';
+      var searchElem = document.getElementById('adminSearchInput');
+      var searchVal = searchElem ? searchElem.value : '';
 
-      var filters = { date: dateVal, client: clientVal, project: projVal };
+      var filters = {
+        period: adminPeriod,
+        date: dateVal,
+        client: clientVal,
+        project: projVal,
+        team: teamVal,
+        shift: shiftVal,
+        search: searchVal
+      };
+
       var tbody = document.getElementById('adminStaffTableBody');
+      var refTbody = document.getElementById('adminRefSummaryTableBody');
       var syncIcon = document.getElementById('adminSyncIcon');
 
-      if (!isSilent && tbody) {
-        tbody.innerHTML = '<tr><td colspan="13" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading Admin Shift Logs...</td></tr>';
+      if (!isSilent) {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading Consolidated Dashboard...</td></tr>';
+        }
+        if (refTbody) {
+          refTbody.innerHTML = '<tr><td colspan="13" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading Executive Productivity Summary...</td></tr>';
+        }
       }
 
       if (syncIcon) syncIcon.classList.add('fa-spin');
@@ -1612,27 +1870,143 @@
               renderAdminDashboard(res);
             } else {
               if (!isSilent && tbody) {
-                tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${res ? res.message : 'Error fetching admin data.'}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">${res ? res.message : 'Error fetching admin dashboard data.'}</td></tr>`;
               }
             }
           })
           .withFailureHandler(function (err) {
             if (syncIcon) syncIcon.classList.remove('fa-spin');
             if (!isSilent && tbody) {
-              tbody.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4">${err ? err.toString() : 'Server Error fetching admin data.'}</td></tr>`;
+              tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">${err ? err.toString() : 'Server Error fetching dashboard data.'}</td></tr>`;
             }
           })
           .getAdminDashboardData(filters);
       } else {
         if (syncIcon) syncIcon.classList.remove('fa-spin');
         adminLastSyncTimestamp = Date.now();
-        // Simulated preview data
+        // Preview mock data
         var mockRes = {
           success: true,
-          summary: { totalEmployees: 5, clockedInCount: 2, onBreakCount: 1, leaveCount: 1, shrinkageRate: 20.0, totalLoggedHours: 16.5, totalEarnedHours: 14.2, totalLeakageHours: 2.3, overallSpeedPct: 86 },
+          period: adminPeriod,
+          dateRange: { startDate: dateVal, endDate: dateVal, label: dateVal },
+          summary: {
+            totalEmployees: 2,
+            clockedInCount: 2,
+            leaveCount: 0,
+            totalLeaveHours: 0.0,
+            totalShiftHours: 16.0,
+            totalLoggedHours: 15.5,
+            totalAvailableProductionHours: 15.0,
+            productionHours: 11.5,
+            productionUtilizationPct: 76.67,
+            meetingHours: 2.5,
+            trainingHours: 1.5,
+            downtimeIdleHours: 0.0
+          },
+          summaryTable: {
+            columns: [
+              'Month', 'Project Name', 'Prod Head Count', 'Support Head Count',
+              'Total Available Production Hrs', 'Active production Hours', 'Training (Client + Internal)',
+              'Idle', 'Down Time', 'Meeting (Client + Internal)', 'Leave',
+              'Production Utilization %', 'Non Productive Hours %'
+            ],
+            rows: [
+              {
+                period: 'Aug',
+                projectName: 'iMerit - AMBALL',
+                prodHeadCount: 45,
+                supportHeadCount: 6,
+                totalAvailableProdHrs: 3038,
+                activeProductionHrs: 589.9,
+                trainingHrs: 542.5,
+                idleHrs: 876.6,
+                downTimeHrs: 0,
+                meetingHrs: 651,
+                leaveHrs: 378,
+                productionUtilizationPct: 19.42,
+                nonProductiveHoursPct: 68.14
+              },
+              {
+                period: 'Sep',
+                projectName: 'iMerit - AMBALL',
+                prodHeadCount: 50,
+                supportHeadCount: 9,
+                totalAvailableProdHrs: 9667,
+                activeProductionHrs: 4224.49,
+                trainingHrs: 1381,
+                idleHrs: 1791.51,
+                downTimeHrs: 0,
+                meetingHrs: 1381,
+                leaveHrs: 889,
+                productionUtilizationPct: 43.70,
+                nonProductiveHoursPct: 47.10
+              },
+              {
+                period: 'Oct',
+                projectName: 'iMerit - AMBALL',
+                prodHeadCount: 46,
+                supportHeadCount: 9,
+                totalAvailableProdHrs: 8218,
+                activeProductionHrs: 3150.17,
+                trainingHrs: 1467.5,
+                idleHrs: 1286.33,
+                downTimeHrs: 0,
+                meetingHrs: 1761,
+                leaveHrs: 553,
+                productionUtilizationPct: 38.33,
+                nonProductiveHoursPct: 54.94
+              },
+              {
+                period: 'Nov till 3th',
+                projectName: 'iMerit - AMBALL',
+                prodHeadCount: 46,
+                supportHeadCount: 8,
+                totalAvailableProdHrs: 966,
+                activeProductionHrs: 271.83,
+                trainingHrs: 172.5,
+                idleHrs: 272.67,
+                downTimeHrs: 0,
+                meetingHrs: 207,
+                leaveHrs: 42,
+                productionUtilizationPct: 28.14,
+                nonProductiveHoursPct: 67.51
+              }
+            ],
+            total: {
+              period: 'Total',
+              projectName: '',
+              prodHeadCount: 46.75,
+              supportHeadCount: 8,
+              totalAvailableProdHrs: 21889,
+              activeProductionHrs: 8236.39,
+              trainingHrs: 3563.5,
+              idleHrs: 4227.11,
+              downTimeHrs: 0,
+              meetingHrs: 4000,
+              leaveHrs: 1862,
+              productionUtilizationPct: 37.63,
+              nonProductiveHoursPct: 62.37
+            }
+          },
+          timeByActivity: [
+            { activity: 'Production', hours: 11.5, percentage: 74.2 },
+            { activity: 'Client Meeting', hours: 1.5, percentage: 9.7 },
+            { activity: 'Internal Meeting', hours: 1.0, percentage: 6.5 },
+            { activity: 'Training (Material Go-Through)', hours: 1.5, percentage: 9.7 },
+            { activity: 'Idle', hours: 0, percentage: 0 },
+            { activity: 'Down Time', hours: 0, percentage: 0 }
+          ],
+          timeByClient: [
+            { client: 'iMerit', hours: 9.5, percentage: 61.3 },
+            { client: 'Hurix', hours: 6.0, percentage: 38.7 }
+          ],
+          timeByProject: [
+            { client: 'iMerit', project: 'Pravah', hours: 9.5, percentage: 61.3 },
+            { client: 'Hurix', project: 'HDS', hours: 6.0, percentage: 38.7 }
+          ],
           employeeStatusList: [
-            { emp_id: 'CC1778', emp_name: 'Arunprakash B', team: 'Annotation', work_mode: 'Office', shift_status: 'OPEN', log_id: 'LOG-1001', shift_start_time: '09:00:00', shift_end_time: '--:--', total_break_minutes: 30, total_shift_hours: 4.5, earned_hours: 4.0, leakage_hours: 0.5, tasks_count: 2, tasks: [{ active_client: 'iMerit', active_project: 'Pravah', task_count: 15, work_start_time: '09:00:00', work_end_time: '12:00:00', productive_hours: 2.5, actual_worked_hours: 3.0, performance_leakage_hours: 0.5, speed_efficiency_pct: 83, user_remarks: 'Completed Batch 1' }] },
-            { emp_id: 'CC1770', emp_name: 'Logesh G', team: 'Annotation', work_mode: 'Office', shift_status: 'OPEN', log_id: 'LOG-1002', shift_start_time: '09:15:00', shift_end_time: '--:--', total_break_minutes: 15, total_shift_hours: 4.25, earned_hours: 4.5, leakage_hours: 0.0, tasks_count: 3, tasks: [{ active_client: 'Hurix', active_project: 'HDS', task_count: 25, work_start_time: '09:15:00', work_end_time: '13:00:00', productive_hours: 3.75, actual_worked_hours: 3.75, performance_leakage_hours: 0.0, speed_efficiency_pct: 100, user_remarks: 'QC Verified' }] }
+            { emp_id: 'CC1778', emp_name: 'Arunprakash B', team: 'Annotation', work_mode: 'Office', shift_type: 'General', shift_status: 'OPEN', days_worked: 1, days_leave: 0, leave_hours: 0, net_shift_hours: 8.0, total_task_hours: 8.0, primary_client: 'iMerit', primary_project: 'Pravah', activity_breakdown: { 'Production': 6.0, 'Client Meeting': 1.0, 'Internal Meeting': 0.5, 'Training (Material Go-Through)': 0.5, 'Idle': 0, 'Down Time': 0 }, tasks: [] },
+            { emp_id: 'CC1770', emp_name: 'Logesh G', team: 'Annotation', work_mode: 'Office', shift_type: '1st', shift_status: 'OPEN', days_worked: 1, days_leave: 0, leave_hours: 0, net_shift_hours: 7.0, total_task_hours: 7.5, primary_client: 'Hurix', primary_project: 'HDS', activity_breakdown: { 'Production': 5.5, 'Client Meeting': 0.5, 'Internal Meeting': 0.5, 'Training (Material Go-Through)': 1.0, 'Idle': 0, 'Down Time': 0 }, tasks: [] }
           ],
           leaveQueue: []
         };
@@ -1645,315 +2019,609 @@
       try {
         if (!data || !data.summary) return;
 
-        // 1. Render Summary KPI & Table Matrix elements safely
-        var totalStaffVal = data.summary.totalEmployees || 0;
-        var clockedInVal = data.summary.clockedInCount || 0;
-        var notClockedVal = data.summary.notClockedInCount || 0;
-        var onBreakVal = data.summary.onBreakCount || 0;
-        var leaveVal = data.summary.leaveCount || 0;
-        var shrinkVal = data.summary.shrinkageRate || 0.0;
-
-        if (document.getElementById('adminTotalStaff')) document.getElementById('adminTotalStaff').textContent = totalStaffVal;
-        if (document.getElementById('adminTotalStaffVal')) document.getElementById('adminTotalStaffVal').textContent = totalStaffVal;
-
-        if (document.getElementById('adminClockedIn')) document.getElementById('adminClockedIn').textContent = clockedInVal;
-        if (document.getElementById('adminClockedInSub')) document.getElementById('adminClockedInSub').textContent = clockedInVal;
-
-        if (document.getElementById('adminNotClockedIn')) document.getElementById('adminNotClockedIn').textContent = notClockedVal;
-
-        if (document.getElementById('adminOnBreak')) document.getElementById('adminOnBreak').textContent = onBreakVal;
-        if (document.getElementById('adminOnBreakSub')) document.getElementById('adminOnBreakSub').textContent = onBreakVal;
-
-        if (document.getElementById('adminOnLeaveCnt')) document.getElementById('adminOnLeaveCnt').textContent = leaveVal;
-        if (document.getElementById('adminShrinkageRate')) document.getElementById('adminShrinkageRate').textContent = (Number(shrinkVal) || 0).toFixed(2) + '%';
-
-        if (document.getElementById('adminPL')) document.getElementById('adminPL').textContent = data.summary.plCount || 0;
-        if (document.getElementById('adminUL')) document.getElementById('adminUL').textContent = data.summary.ulCount || 0;
-        if (document.getElementById('adminHL')) document.getElementById('adminHL').textContent = data.summary.hlCount || 0;
-        if (document.getElementById('adminPerm')) document.getElementById('adminPerm').textContent = data.summary.permCount || 0;
-        if (document.getElementById('adminTotalPermHrs')) document.getElementById('adminTotalPermHrs').textContent = (data.summary.totalPermissionHours || 0).toFixed(2);
-
-        var totalAbs = (Number(data.summary.plCount) || 0) + (Number(data.summary.ulCount) || 0) + (Number(data.summary.hlCount) || 0) + (Number(data.summary.permCount) || 0);
-        if (document.getElementById('adminTotalAbsences')) document.getElementById('adminTotalAbsences').textContent = totalAbs;
-
-        if (document.getElementById('adminActualWorkedHours')) document.getElementById('adminActualWorkedHours').textContent = (Number(data.summary.totalLoggedHours) || 0).toFixed(2) + ' hrs';
-        if (document.getElementById('adminTotalTaskHours')) document.getElementById('adminTotalTaskHours').textContent = (Number(data.summary.totalTaskHours) || 0).toFixed(2) + ' hrs';
-        if (document.getElementById('adminEarnedHours')) document.getElementById('adminEarnedHours').textContent = (Number(data.summary.totalEarnedHours) || 0).toFixed(2) + ' hrs';
-        if (document.getElementById('adminTotalIdleHours')) document.getElementById('adminTotalIdleHours').textContent = (Number(data.summary.totalIdleHours) || 0).toFixed(2) + ' hrs';
-        if (document.getElementById('adminTotalBenchHours')) document.getElementById('adminTotalBenchHours').textContent = (Number(data.summary.totalBenchHours) || 0).toFixed(2) + ' hrs';
-        if (document.getElementById('adminTotalBlockedHours')) document.getElementById('adminTotalBlockedHours').textContent = (Number(data.summary.totalBlockedHours) || 0).toFixed(2) + ' hrs';
-
-        var speedVal = Number(data.summary.overallSpeedPct) || 0;
-        var speedColorClass = speedVal >= 100 ? 'text-success' : (speedVal >= 80 ? 'text-primary' : 'text-danger');
-        if (document.getElementById('adminOverallSpeedPct')) {
-          var speedElem = document.getElementById('adminOverallSpeedPct');
-          speedElem.className = 'fw-bold mb-0 mt-1 ' + speedColorClass;
-          speedElem.innerHTML = speedVal + ' <span class="fs-6 text-muted">%</span>';
+        // Populate Client Filter options and cache client master
+        if (data.clientMaster && data.clientMaster.length > 0) {
+          clientMasterData = data.clientMaster;
+          var clientSelect = document.getElementById('adminFilterClient');
+          if (clientSelect && clientSelect.options.length <= 1) {
+            var clients = [];
+            data.clientMaster.forEach(function (cp) {
+              if (cp.client_name && clients.indexOf(cp.client_name) === -1) {
+                clients.push(cp.client_name);
+              }
+            });
+            clients.sort().forEach(function (c) {
+              var opt = document.createElement('option');
+              opt.value = c;
+              opt.textContent = c;
+              clientSelect.appendChild(opt);
+            });
+          }
         }
-        if (document.getElementById('adminSpeedBadgePct')) document.getElementById('adminSpeedBadgePct').textContent = speedVal;
 
-        if (document.getElementById('adminLeakageHours')) document.getElementById('adminLeakageHours').textContent = (Number(data.summary.totalLeakageHours) || 0).toFixed(2) + ' hrs';
+        // Dynamically update Google Sheet anchor URL if provided
+        if (data.spreadsheetUrl) {
+          var sheetLink = document.getElementById('adminMasterSheetLink');
+          if (sheetLink) sheetLink.href = data.spreadsheetUrl;
+        }
 
-        // Update Quick Status Filter Chip Counts & Active Highlights
-        var allList = data.employeeStatusList || [];
-        var clockedInTodayCnt = 0, breakCnt = 0, pendingCnt = 0, leaveCnt = 0;
-        allList.forEach(function (e) {
-          if (!e) return;
-          var sStatus = String(e.shift_status || '').toUpperCase();
-          var aStatus = String(e.attendance_status || '').toUpperCase();
-          var isLeave = (sStatus === 'LEAVE_CLOSED' || ['PL', 'UL', 'HL', 'PERMISSION', 'OD'].indexOf(aStatus) !== -1 || (aStatus !== 'PRESENT' && aStatus !== 'NOT_CLOCKED_IN' && aStatus !== ''));
+        // Period Labels & Badges
+        var rangeLabel = (data.dateRange && data.dateRange.label) ? data.dateRange.label : (data.targetDate || 'Today');
+        var badgeText = (data.period ? data.period.toUpperCase() : 'DAY') + ': ' + rangeLabel;
+        if (document.getElementById('adminPeriodRangeBadge')) document.getElementById('adminPeriodRangeBadge').textContent = badgeText;
+        if (document.getElementById('adminPeriodDetailLabel')) document.getElementById('adminPeriodDetailLabel').textContent = rangeLabel;
 
-          if (sStatus === 'OPEN' || sStatus === 'ON_BREAK' || sStatus === 'CLOSED' || aStatus === 'PRESENT') {
-            clockedInTodayCnt++;
-          }
-          if (sStatus === 'ON_BREAK') {
-            breakCnt++;
-          } else if (isLeave) {
-            leaveCnt++;
-          } else if (sStatus === 'NOT_CLOCKED_IN' || (!sStatus && !isLeave)) {
-            pendingCnt++;
-          }
-        });
+        // KPI Scorecards
+        var sum = data.summary;
+        if (document.getElementById('adminTotalStaffVal')) document.getElementById('adminTotalStaffVal').textContent = sum.totalEmployees || 0;
+        if (document.getElementById('adminTotalStaff')) document.getElementById('adminTotalStaff').textContent = sum.totalEmployees || 0;
+        if (document.getElementById('adminClockedInSub')) document.getElementById('adminClockedInSub').textContent = sum.clockedInCount || 0;
+        if (document.getElementById('adminClockedIn')) document.getElementById('adminClockedIn').textContent = sum.clockedInCount || 0;
 
-        if (document.getElementById('adminClockedInSub')) document.getElementById('adminClockedInSub').textContent = clockedInTodayCnt;
+        if (document.getElementById('adminOnLeaveCnt')) document.getElementById('adminOnLeaveCnt').textContent = sum.leaveCount || 0;
+        if (document.getElementById('adminTotalLeaveHoursVal')) {
+          var leaveHrsVal = Number(sum.totalLeaveHours || sum.leaveHours || 0);
+          document.getElementById('adminTotalLeaveHoursVal').textContent = leaveHrsVal.toFixed(1);
+        }
+        if (document.getElementById('adminPL')) document.getElementById('adminPL').textContent = sum.plCount || 0;
+        if (document.getElementById('adminUL')) document.getElementById('adminUL').textContent = sum.ulCount || 0;
+        if (document.getElementById('adminHL')) document.getElementById('adminHL').textContent = sum.hlCount || 0;
+        if (document.getElementById('adminPerm')) document.getElementById('adminPerm').textContent = sum.permCount || 0;
+        if (document.getElementById('adminTotalPermHrs')) document.getElementById('adminTotalPermHrs').textContent = Number(sum.totalPermissionHours || 0).toFixed(2);
 
-        if (document.getElementById('countChipALL')) document.getElementById('countChipALL').textContent = allList.length;
-        if (document.getElementById('countChipCLOCKED_IN_TODAY')) document.getElementById('countChipCLOCKED_IN_TODAY').textContent = clockedInTodayCnt;
-        if (document.getElementById('countChipNOT_CLOCKED_IN')) document.getElementById('countChipNOT_CLOCKED_IN').textContent = pendingCnt;
-        if (document.getElementById('countChipLEAVE_CLOSED')) document.getElementById('countChipLEAVE_CLOSED').textContent = leaveCnt;
-        if (document.getElementById('countChipON_BREAK')) document.getElementById('countChipON_BREAK').textContent = breakCnt;
+        // Net Shift Working Hours (1h break auto-deducted)
+        var shiftHrs = Number(sum.totalShiftHours) || 0;
+        if (document.getElementById('adminActualWorkedHours')) document.getElementById('adminActualWorkedHours').textContent = shiftHrs.toFixed(2) + 'h';
 
-        var currentStatusFilter = document.getElementById('adminFilterStatus') ? document.getElementById('adminFilterStatus').value : 'ALL';
+        // Total Available Production Hours (Avg HC x Shift Hrs)
+        var availProd = Number(sum.totalAvailableProductionHours || (data.summaryTable && data.summaryTable.total ? data.summaryTable.total.totalAvailableProdHrs : 0)) || 0;
+        if (document.getElementById('adminTotalAvailProdHours')) document.getElementById('adminTotalAvailProdHours').textContent = availProd.toFixed(2) + 'h';
 
-        // Update quick chip button active highlight styles
-        var chipKeys = ['ALL', 'CLOCKED_IN_TODAY', 'NOT_CLOCKED_IN', 'LEAVE_CLOSED', 'ON_BREAK'];
-        chipKeys.forEach(function (key) {
-          var chipBtn = document.getElementById('chipStatus' + key);
-          if (chipBtn) {
-            if (key === currentStatusFilter || (key === 'CLOCKED_IN_TODAY' && currentStatusFilter === 'OPEN')) {
-              chipBtn.classList.add('shadow-sm');
-              if (key === 'ALL') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-primary fw-bold text-white shadow-sm';
-              else if (key === 'CLOCKED_IN_TODAY') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-success fw-bold text-white shadow-sm';
-              else if (key === 'NOT_CLOCKED_IN') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-danger fw-bold text-white shadow-sm';
-              else if (key === 'LEAVE_CLOSED') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-secondary fw-bold text-white shadow-sm';
-              else if (key === 'ON_BREAK') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-warning fw-bold text-dark shadow-sm';
-            } else {
-              if (key === 'ALL') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-outline-primary fw-bold';
-              else if (key === 'CLOCKED_IN_TODAY') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-outline-success fw-bold';
-              else if (key === 'NOT_CLOCKED_IN') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-outline-danger fw-bold';
-              else if (key === 'LEAVE_CLOSED') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-outline-secondary fw-bold';
-              else if (key === 'ON_BREAK') chipBtn.className = 'btn btn-sm py-0 px-2.5 rounded-pill btn-outline-warning text-dark fw-bold';
+        // Work Log Hours & Categories
+        var taskHrs = Number(sum.totalLoggedHours || sum.totalTaskHours) || 0;
+        if (document.getElementById('adminTotalTaskHours')) document.getElementById('adminTotalTaskHours').textContent = taskHrs.toFixed(2) + ' hrs';
+
+        var prodHrs = Number(sum.productionHours) || 0;
+        if (document.getElementById('adminProductionHours')) document.getElementById('adminProductionHours').textContent = prodHrs.toFixed(2) + 'h';
+
+        // Production Utilization %
+        var prodUtil = Number(sum.productionUtilizationPct || (data.summaryTable && data.summaryTable.total ? data.summaryTable.total.productionUtilizationPct : 0)) || 0;
+        if (document.getElementById('adminProdUtilPct')) document.getElementById('adminProdUtilPct').textContent = prodUtil.toFixed(2) + '%';
+
+        // Non-Productive Hours (Meeting + Training + Downtime/Idle)
+        var nonProdHrs = Number((sum.meetingHours || 0) + (sum.trainingHours || 0) + (sum.downtimeIdleHours || 0));
+        if (document.getElementById('adminMeetingNonProdHours')) document.getElementById('adminMeetingNonProdHours').textContent = nonProdHrs.toFixed(2) + 'h';
+
+        var meetHrs = Number(sum.meetingHours) || 0;
+        if (document.getElementById('adminMeetingHours')) document.getElementById('adminMeetingHours').textContent = meetHrs.toFixed(2) + ' hrs';
+
+        var trainDownHrs = Number((sum.trainingHours || 0) + (sum.downtimeIdleHours || 0));
+        if (document.getElementById('adminTrainingDowntimeHours')) document.getElementById('adminTrainingDowntimeHours').textContent = trainDownHrs.toFixed(2) + ' hrs';
+
+        // Render Executive Productivity & Headcount Summary Table (#adminRefSummaryTableBody & #adminRefSummaryTableFoot)
+        var refTbody = document.getElementById('adminRefSummaryTableBody');
+        var refTfoot = document.getElementById('adminRefSummaryTableFoot');
+        if (refTbody) {
+          refTbody.innerHTML = '';
+          if (refTfoot) refTfoot.innerHTML = '';
+
+          var sumTable = data.summaryTable || {};
+          var rows = sumTable.rows || [];
+
+          if (rows.length === 0) {
+            refTbody.innerHTML = '<tr><td colspan="13" class="text-center py-4 text-muted">No productivity records found matching active filter criteria.</td></tr>';
+          } else {
+            rows.forEach(function (r) {
+              var tr = document.createElement('tr');
+              var utilVal = Number(r.productionUtilizationPct) || 0;
+              var nonProdVal = Number(r.nonProductiveHoursPct) || 0;
+              var utilColor = utilVal >= 50 ? '#059669' : (utilVal >= 30 ? '#d97706' : '#dc2626');
+              tr.innerHTML = `
+                <td class="fw-bold">${r.period || ''}</td>
+                <td class="text-start fw-semibold">${r.projectName || ''}</td>
+                <td>${r.prodHeadCount !== undefined ? r.prodHeadCount : 0}</td>
+                <td>${r.supportHeadCount !== undefined ? r.supportHeadCount : 0}</td>
+                <td class="fw-bold">${r.totalAvailableProdHrs !== undefined ? r.totalAvailableProdHrs : 0}</td>
+                <td>${r.activeProductionHrs !== undefined ? r.activeProductionHrs : 0}</td>
+                <td>${r.trainingHrs !== undefined ? r.trainingHrs : 0}</td>
+                <td>${r.idleHrs !== undefined ? r.idleHrs : 0}</td>
+                <td>${r.downTimeHrs || 0}</td>
+                <td>${r.meetingHrs !== undefined ? r.meetingHrs : 0}</td>
+                <td class="text-danger fw-bold">${r.leaveHrs !== undefined ? r.leaveHrs : 0}</td>
+                <td class="fw-bold" style="color: ${utilColor};">${utilVal.toFixed(2)}%</td>
+                <td class="fw-bold" style="color: #4b5563;">${nonProdVal.toFixed(2)}%</td>
+              `;
+              refTbody.appendChild(tr);
+            });
+
+            if (refTfoot && sumTable.total) {
+              var tot = sumTable.total;
+              var totUtilVal = Number(tot.productionUtilizationPct) || 0;
+              var totNonProdVal = Number(tot.nonProductiveHoursPct) || 0;
+              var totUtilColor = totUtilVal >= 50 ? '#059669' : (totUtilVal >= 30 ? '#d97706' : '#dc2626');
+              refTfoot.innerHTML = `
+                <tr class="total-row">
+                  <td class="fw-bold">Total</td>
+                  <td></td>
+                  <td class="fw-bold">${tot.prodHeadCount !== undefined ? tot.prodHeadCount : 0}</td>
+                  <td class="fw-bold">${tot.supportHeadCount !== undefined ? tot.supportHeadCount : 0}</td>
+                  <td class="fw-bold">${tot.totalAvailableProdHrs !== undefined ? tot.totalAvailableProdHrs : 0}</td>
+                  <td class="fw-bold">${tot.activeProductionHrs !== undefined ? tot.activeProductionHrs : 0}</td>
+                  <td class="fw-bold">${tot.trainingHrs !== undefined ? tot.trainingHrs : 0}</td>
+                  <td class="fw-bold">${tot.idleHrs !== undefined ? tot.idleHrs : 0}</td>
+                  <td class="fw-bold">${tot.downTimeHrs || 0}</td>
+                  <td class="fw-bold">${tot.meetingHrs !== undefined ? tot.meetingHrs : 0}</td>
+                  <td class="fw-bold text-danger">${tot.leaveHrs !== undefined ? tot.leaveHrs : 0}</td>
+                  <td class="fw-bold" style="color: ${totUtilColor};">${totUtilVal.toFixed(2)}%</td>
+                  <td class="fw-bold" style="color: #4b5563;">${totNonProdVal.toFixed(2)}%</td>
+                </tr>
+              `;
             }
           }
-        });
+        }
 
+        // Render Activity Breakdown Bars (#activityBreakdownContainer)
+        var actContainer = document.getElementById('activityBreakdownContainer');
+        if (actContainer) {
+          actContainer.innerHTML = '';
+          var actList = data.timeByActivity || [];
+          if (actList.length === 0) {
+            actContainer.innerHTML = '<div class="text-center py-4 text-muted">No activity time logged in this period.</div>';
+          } else {
+            var colorMap = {
+              'Production': '#10b981',
+              'Support': '#0284c7',
+              'Client Meeting': '#3b82f6',
+              'Internal Meeting': '#8b5cf6',
+              'Training (Material Go-Through)': '#f59e0b',
+              'Idle': '#64748b',
+              'Down Time': '#ef4444'
+            };
 
-
-        // Filter staff list according to active status, client, project, and column filter selections
-        updateColFilterHeaderUI();
-        var filteredStaffList = getFilteredAdminStaffList();
-
-        // 2. Render Live Staff Table (13 Columns)
-        var tbody = document.getElementById('adminStaffTableBody');
-        var tfoot = document.getElementById('adminStaffTableFoot');
-        if (!tbody) return;
-        tbody.innerHTML = '';
-        if (tfoot) tfoot.innerHTML = '';
-
-        if (!filteredStaffList || filteredStaffList.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-4">No staff records match selected status filter.</td></tr>';
-        } else {
-          var sumWorked = 0, sumEarned = 0, sumLeakage = 0, sumIdle = 0, sumBench = 0, sumBlocked = 0, sumBreakMins = 0, sumPermHrs = 0;
-
-          filteredStaffList.forEach(function (emp, index) {
-            if (!emp) return;
-            var badgeClass = 'badge-closed';
-            var pulseDot = '';
-            if (emp.shift_status === 'OPEN') {
-              badgeClass = 'badge-open';
-              pulseDot = '<span class="pulse-dot-green"></span>';
-            } else if (emp.shift_status === 'ON_BREAK') {
-              badgeClass = 'badge-break';
-              pulseDot = '<span class="pulse-dot-amber"></span>';
-            } else if (emp.shift_status === 'NOT_CLOCKED_IN') {
-              badgeClass = 'badge-not-clocked';
-            } else if (emp.shift_status === 'LEAVE_CLOSED') {
-              badgeClass = 'badge-closed';
-            }
-
-            var isLeaveRow = (['PL', 'UL', 'HL', 'ABSENT', 'LEAVE_CLOSED'].indexOf(String(emp.attendance_status || '').toUpperCase()) !== -1 || String(emp.shift_status || '').toUpperCase() === 'LEAVE_CLOSED');
-            var isFullLeaveRow = (['PL', 'UL', 'ABSENT', 'LEAVE_CLOSED'].indexOf(String(emp.attendance_status || '').toUpperCase()) !== -1 || String(emp.shift_status || '').toUpperCase() === 'LEAVE_CLOSED');
-            var isHalfLeaveRow = (String(emp.attendance_status || '').toUpperCase() === 'HL');
-
-            var empTaskActual = isFullLeaveRow ? 0 : (Number(emp.actual_worked_hours) || 0);
-            var empEarned = isFullLeaveRow ? 0 : (Number(emp.earned_hours) || 0);
-            var empLeakage = isFullLeaveRow ? 0 : (Number(emp.leakage_hours) || 0);
-            var empWorked = isFullLeaveRow ? 0 : (isHalfLeaveRow ? Math.min(4.50, Number(emp.total_shift_hours) || 0) : (Number(emp.total_shift_hours) || 0));
-            var empBreakMins = isFullLeaveRow ? 0 : (Number(emp.total_break_minutes) || 0);
-            var empPermHrs = isLeaveRow ? 0 : (Number(emp.permission_hours) || 0);
-            var empIdle = isFullLeaveRow ? 0 : (Number(emp.idle_hours) || 0);
-            var empBench = isFullLeaveRow ? 0 : (Number(emp.bench_hours) || 0);
-            var empBlocked = isFullLeaveRow ? 0 : (Number(emp.blocked_hours) || 0);
-
-            sumWorked += empWorked;
-            sumEarned += empEarned;
-            sumLeakage += empLeakage;
-            sumIdle += empIdle;
-            sumBench += empBench;
-            sumBlocked += empBlocked;
-            sumBreakMins += empBreakMins;
-            sumPermHrs += empPermHrs;
-
-            var empSpeedPct = empTaskActual > 0 ? Math.round((empEarned / empTaskActual) * 100) : 0;
-            var empSpeedBadge = '';
-            if (empTaskActual > 0 && emp.tasks_count > 0) {
-              var empSpeedClass = empSpeedPct >= 100 ? 'bg-success-subtle text-success border border-success-subtle' : (empSpeedPct >= 80 ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-warning-subtle text-dark border border-warning-subtle');
-              var empSpeedIcon = empSpeedPct >= 100 ? '⚡' : (empSpeedPct >= 80 ? '⏱️' : '🐢');
-              empSpeedBadge = `<span class="badge ${empSpeedClass} ms-1" style="font-size:0.7rem;">${empSpeedIcon} ${empSpeedPct}%</span>
-                               <div><small class="text-muted">Task: ${empTaskActual.toFixed(2)} hrs</small></div>`;
-            }
-
-            var realEmpPermHrs = isLeaveRow ? 0 : empPermHrs;
-
-            var permColHtml = realEmpPermHrs > 0 ?
-              `<span class="badge bg-purple-subtle text-purple border" style="background-color:#f3e8ff;color:#7e22ce;font-weight:700;"><i class="fa-solid fa-clock-rotate-left me-1"></i>${realEmpPermHrs.toFixed(2)} hrs</span>` :
-              `<span class="text-muted">0.00 hrs</span>`;
-
-            var shiftTimesDisplay = isFullLeaveRow ? '--:--' : `${emp.shift_start_time || '--:--'} - ${emp.shift_end_time || '--:--'}`;
-
-            var statusLabel = emp.attendance_status || String(emp.shift_status || '').replace(/_/g, ' ');
-            var statusExtraPerm = (realEmpPermHrs > 0 && emp.shift_status === 'OPEN') ?
-              `<div class="mt-1"><span class="badge bg-purple-subtle text-purple border" style="font-size:0.68rem;background-color:#f3e8ff;color:#7e22ce;"><i class="fa-solid fa-clock-rotate-left me-1"></i>${realEmpPermHrs.toFixed(2)}h Perm</span></div>` : '';
-
-            var tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>
-                <div class="fw-bold">${emp.emp_name || 'N/A'}</div>
-                <small class="text-muted">${emp.emp_id || ''} • ${emp.email || ''}</small>
-              </td>
-              <td>
-                <span class="badge bg-light text-dark border">${emp.team || 'Annotation'}</span>
-                <div class="small text-muted mt-1">${emp.work_mode || 'Office'}</div>
-              </td>
-              <td>
-                <span class="small fw-semibold">${shiftTimesDisplay}</span>
-              </td>
-              <td><span class="fw-bold text-secondary">${empBreakMins.toFixed(2)} mins</span></td>
-              <td>${permColHtml}</td>
-              <td class="fw-bold text-primary">${empWorked.toFixed(2)} hrs</td>
-              <td>
-                <div class="fw-bold text-success">${empEarned.toFixed(2)} hrs ${empSpeedBadge}</div>
-              </td>
-              <td class="fw-bold text-danger">${empLeakage.toFixed(2)} hrs</td>
-              <td class="fw-bold text-warning">${empIdle.toFixed(2)} hrs</td>
-              <td class="fw-bold text-purple">${empBlocked.toFixed(2)} hrs</td>
-              <td class="fw-bold text-secondary">${empBench.toFixed(2)} hrs</td>
-              <td><span class="badge-status ${badgeClass}">${pulseDot}${statusLabel}</span>${statusExtraPerm}</td>
-              <td>
-                <div class="btn-group btn-group-sm">
-                  <button onclick="inspectEmpTasks('${emp.emp_id}')" class="btn btn-xs btn-outline-primary py-0 px-1.5" title="Tasks (${emp.tasks_count || (emp.tasks ? emp.tasks.length : 0)})">
-                    <i class="fa-solid fa-list-check me-1"></i>Tasks (${emp.tasks_count || (emp.tasks ? emp.tasks.length : 0)})
-                  </button>
-                  <button onclick="openManagerMarkLeaveModal('${emp.emp_id}')" class="btn btn-xs btn-outline-danger py-0 px-1.5 ms-1" title="Mark Leave / Absent on Behalf">
-                    <i class="fa-solid fa-user-pen"></i>
-                  </button>
+            actList.forEach(function (item) {
+              var color = colorMap[item.activity] || '#0082c8';
+              var rowDiv = document.createElement('div');
+              rowDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="small fw-bold text-dark">
+                    <span class="d-inline-block rounded-circle me-1.5" style="width: 10px; height: 10px; background-color: ${color};"></span>
+                    ${item.activity}
+                  </span>
+                  <span class="small text-muted">
+                    <strong class="text-dark">${item.hours.toFixed(2)} hrs</strong> (${item.percentage}%)
+                  </span>
                 </div>
-              </td>
-            `;
-            tbody.appendChild(tr);
-          });
+                <div class="progress" style="height: 8px;">
+                  <div class="progress-bar" role="progressbar" style="width: ${item.percentage}%; background-color: ${color};" aria-valuenow="${item.percentage}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+              `;
+              actContainer.appendChild(rowDiv);
+            });
+          }
+        }
 
-          if (tfoot) {
-            var labelMap = { 'ALL': 'TOTAL RESOURCES', 'CLOCKED_IN_TODAY': 'CLOCKED IN', 'NOT_CLOCKED_IN': 'PENDING', 'LEAVE_CLOSED': 'ON LEAVE', 'ON_BREAK': 'ON BREAK' };
-            var filterLabel = labelMap[currentStatusFilter] || currentStatusFilter.replace(/_/g, ' ');
-            tfoot.innerHTML = `
-              <tr>
-                <td colspan="3" class="text-uppercase text-dark">TOTAL SUMMARY (${filteredStaffList.length} / ${allList.length} STAFF - ${filterLabel})</td>
-                <td class="text-secondary">${sumBreakMins.toFixed(2)} mins</td>
-                <td class="text-purple">${sumPermHrs.toFixed(2)} hrs</td>
-                <td class="text-primary">${sumWorked.toFixed(2)} hrs</td>
-                <td class="text-success">${sumEarned.toFixed(2)} hrs</td>
-                <td class="text-danger">${sumLeakage.toFixed(2)} hrs</td>
-                <td class="text-warning">${sumIdle.toFixed(2)} hrs</td>
-                <td class="text-purple">${sumBlocked.toFixed(2)} hrs</td>
-                <td class="text-secondary">${sumBench.toFixed(2)} hrs</td>
-                <td colspan="2" class="text-muted font-monospace small">Live Sync</td>
-              </tr>
-            `;
+        // Render Client Breakdown Table (#clientBreakdownTableBody)
+        var clientBody = document.getElementById('clientBreakdownTableBody');
+        if (clientBody) {
+          clientBody.innerHTML = '';
+          var clientList = data.timeByClient || [];
+          if (clientList.length === 0) {
+            clientBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No client logs recorded in this period.</td></tr>';
+          } else {
+            clientList.forEach(function (c) {
+              var tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td><span class="fw-bold text-dark">${c.client}</span></td>
+                <td class="text-end fw-bold text-primary">${c.hours.toFixed(2)} hrs</td>
+                <td class="text-end"><span class="badge bg-light text-secondary border">${c.percentage}%</span></td>
+              `;
+              clientBody.appendChild(tr);
+            });
+          }
+        }
+
+        // Render Project Breakdown Table (#projectBreakdownTableBody)
+        var projBody = document.getElementById('projectBreakdownTableBody');
+        if (projBody) {
+          projBody.innerHTML = '';
+          var projList = data.timeByProject || [];
+          if (projList.length === 0) {
+            projBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No project logs recorded in this period.</td></tr>';
+          } else {
+            projList.forEach(function (p) {
+              var tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td><span class="fw-bold text-dark">${p.project}</span></td>
+                <td><span class="badge bg-light text-muted border">${p.client}</span></td>
+                <td class="text-end fw-bold text-primary">${p.hours.toFixed(2)} hrs</td>
+                <td class="text-end"><span class="badge bg-light text-secondary border">${p.percentage}%</span></td>
+              `;
+              projBody.appendChild(tr);
+            });
+          }
+        }
+
+        // Render Consolidated Associate Roster Table (#adminStaffTableBody)
+        var staffBody = document.getElementById('adminStaffTableBody');
+        var staffFoot = document.getElementById('adminStaffTableFoot');
+        if (staffBody) {
+          staffBody.innerHTML = '';
+          if (staffFoot) staffFoot.innerHTML = '';
+
+          var staffList = data.employeeStatusList || [];
+          if (staffList.length === 0) {
+            staffBody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No associates found matching filter criteria.</td></tr>';
+          } else {
+            var sumNetShift = 0;
+            var sumLeaveHours = 0;
+            var sumWorkLogs = 0;
+
+            staffList.forEach(function (emp, idx) {
+              var netShift = Number(emp.net_shift_hours || emp.total_shift_hours) || 0;
+              var leaveHrs = Number(emp.leave_hours) || 0;
+              var workLogs = Number(emp.total_task_hours || emp.actual_worked_hours) || 0;
+              sumNetShift += netShift;
+              sumLeaveHours += leaveHrs;
+              sumWorkLogs += workLogs;
+
+              var isWO = (emp.attendance_status === 'WO' || emp.shift_status === 'WO');
+              var isHol = (emp.attendance_status === 'HOLIDAY' || emp.shift_status === 'HOLIDAY');
+
+              var statusBadge = '<span class="badge bg-secondary-subtle text-secondary border">Not Clocked</span>';
+              if (isWO) {
+                statusBadge = '<span class="badge bg-secondary text-white"><i class="fa-solid fa-bed me-1"></i>Week Off (WO)</span>';
+              } else if (isHol) {
+                statusBadge = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="fa-solid fa-champagne-glasses me-1"></i>Holiday</span>';
+              } else if (emp.shift_status === 'OPEN') {
+                statusBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="fa-solid fa-circle text-success me-1" style="font-size:0.5rem;"></i>Clocked In</span>';
+              } else if (emp.shift_status === 'CLOSED') {
+                statusBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle">Completed</span>';
+              } else if (emp.days_leave > 0) {
+                statusBadge = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Leave</span>';
+              }
+
+              var shiftBadge = `<span class="badge bg-light text-primary border me-1" style="font-size:0.75rem;"><i class="fa-solid fa-clock me-1"></i>${emp.shift_type || 'General'}</span>`;
+              var periodDaysText = (data.period !== 'day') ? `<div class="small text-muted mt-0.5">${emp.days_worked || 0}d worked</div>` : '';
+
+              // Mini Activity Breakdown Badges
+              var actB = emp.activity_breakdown || {};
+              var prodB = Number(actB['Production'] || 0);
+              var suppB = Number(actB['Support'] || 0);
+              var meetB = Number((actB['Client Meeting'] || 0) + (actB['Internal Meeting'] || 0));
+              var trainB = Number(actB['Training (Material Go-Through)'] || 0);
+              var idleB = Number(actB['Idle'] || 0);
+              var downB = Number(actB['Down Time'] || 0);
+
+              var breakdownHtml = `
+                <div class="d-flex flex-wrap gap-1 align-items-center">
+                  ${prodB > 0 ? `<span class="badge bg-success-subtle text-success border border-success-subtle" title="Production: ${prodB.toFixed(1)}h">Prod: ${prodB.toFixed(1)}h</span>` : ''}
+                  ${suppB > 0 ? `<span class="badge bg-info-subtle text-info border border-info-subtle" style="background:#e0f2fe;color:#0284c7;" title="Support: ${suppB.toFixed(1)}h">Supp: ${suppB.toFixed(1)}h</span>` : ''}
+                  ${meetB > 0 ? `<span class="badge bg-purple-subtle text-purple border" style="background:#f3e8ff;color:#7e22ce;" title="Meetings: ${meetB.toFixed(1)}h">Meet: ${meetB.toFixed(1)}h</span>` : ''}
+                  ${trainB > 0 ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" title="Training: ${trainB.toFixed(1)}h">Train: ${trainB.toFixed(1)}h</span>` : ''}
+                  ${idleB > 0 ? `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" title="Idle: ${idleB.toFixed(1)}h">Idle: ${idleB.toFixed(1)}h</span>` : ''}
+                  ${downB > 0 ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle" title="Down Time: ${downB.toFixed(1)}h">Down: ${downB.toFixed(1)}h</span>` : ''}
+                  ${(prodB === 0 && suppB === 0 && meetB === 0 && trainB === 0 && idleB === 0 && downB === 0) ? `<span class="text-muted small">No activity logged</span>` : ''}
+                </div>
+              `;
+
+              var tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td class="text-center text-muted fw-bold">${idx + 1}</td>
+                <td>
+                  <div class="fw-bold text-dark">${emp.emp_name}</div>
+                  <div class="small text-muted">${emp.emp_id} • <span class="badge bg-light text-muted border">${emp.team || 'Annotation'}</span></div>
+                </td>
+                <td>
+                  <div class="fw-semibold text-dark">${emp.primary_client || 'General'}</div>
+                  <small class="text-muted">${emp.primary_project || 'Standard'}</small>
+                </td>
+                <td>
+                  <div class="d-flex flex-column gap-1">
+                    <div>${shiftBadge}</div>
+                    <div>${statusBadge}</div>
+                    ${periodDaysText}
+                  </div>
+                </td>
+                <td class="text-end fw-bold text-info">${netShift.toFixed(2)} hrs</td>
+                <td class="text-end fw-bold text-danger">${leaveHrs > 0 ? leaveHrs.toFixed(2) + ' hrs' : '<span class="text-muted fw-normal">--</span>'}</td>
+                <td class="text-end fw-bold text-primary">${workLogs.toFixed(2)} hrs</td>
+                <td>${breakdownHtml}</td>
+                <td class="text-center">
+                  <div class="d-inline-flex align-items-center gap-1">
+                    <button onclick="inspectEmpWorkLogs('${emp.emp_id}')" class="btn btn-outline-primary btn-sm py-0 px-2" title="Inspect Work Logs">
+                      <i class="fa-solid fa-list-check me-1"></i>Logs (${emp.tasks_count || (emp.tasks ? emp.tasks.length : 0)})
+                    </button>
+                    <div class="btn-group btn-group-sm" role="group">
+                      <button type="button" onclick="quickToggleScheduleStatus('${emp.emp_id}', 'WO')" 
+                              class="btn ${isWO ? 'btn-secondary text-white' : 'btn-outline-secondary'} py-0 px-1.5" 
+                              style="font-size: 0.72rem; font-weight: 700;" title="${isWO ? 'Click to clear Week Off' : 'Set Week Off (WO)'}">
+                        WO
+                      </button>
+                      <button type="button" onclick="quickToggleScheduleStatus('${emp.emp_id}', 'HOLIDAY')" 
+                              class="btn ${isHol ? 'btn-warning text-dark fw-bold' : 'btn-outline-warning text-dark'} py-0 px-1.5" 
+                              style="font-size: 0.72rem; font-weight: 700;" title="${isHol ? 'Click to clear Holiday' : 'Set Holiday'}">
+                        HOL
+                      </button>
+                    </div>
+                  </div>
+                </td>
+              `;
+              staffBody.appendChild(tr);
+            });
+
+            if (staffFoot) {
+              staffFoot.innerHTML = `
+                <tr>
+                  <td colspan="4" class="text-uppercase text-dark text-end">TOTALS (${staffList.length} ASSOCIATES):</td>
+                  <td class="text-end text-info">${sumNetShift.toFixed(2)} hrs</td>
+                  <td class="text-end text-danger">${sumLeaveHours.toFixed(2)} hrs</td>
+                  <td class="text-end text-primary">${sumWorkLogs.toFixed(2)} hrs</td>
+                  <td colspan="2"></td>
+                </tr>
+              `;
+            }
           }
         }
       } catch (renderErr) {
         console.error('renderAdminDashboard Error:', renderErr);
-        var tbodyErr = document.getElementById('adminStaffTableBody');
-        if (tbodyErr) {
-          tbodyErr.innerHTML = `<tr><td colspan="13" class="text-center text-danger py-4"><i class="fa-solid fa-triangle-exclamation me-2"></i>Error rendering table: ${renderErr ? renderErr.message : 'Unknown Error'}</td></tr>`;
+        var staffBodyErr = document.getElementById('adminStaffTableBody');
+        if (staffBodyErr) {
+          staffBodyErr.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4"><i class="fa-solid fa-triangle-exclamation me-2"></i>Error rendering consolidated dashboard: ${renderErr ? renderErr.message : 'Unknown Error'}</td></tr>`;
         }
       }
     }
 
-    function onAdminStatusFilterChange() {
-      if (adminDataCache) {
-        renderAdminDashboard(adminDataCache);
+    function inspectEmpWorkLogs(empParam) {
+      if (!adminDataCache || !adminDataCache.employeeStatusList || adminDataCache.employeeStatusList.length === 0) return;
+      var emp = null;
+      if (typeof empParam === 'number') {
+        emp = adminDataCache.employeeStatusList[empParam];
       }
-    }
-
-    function setStatusFilter(statusVal) {
-      var selectElem = document.getElementById('adminFilterStatus');
-      if (selectElem) {
-        selectElem.value = statusVal;
-      }
-      onAdminStatusFilterChange();
-    }
-
-    function filterByKpi(filterKey) {
-      setStatusFilter(filterKey);
-    }
-
-    // 3. Render Leave Verification Queue Table
-    var leaveBody = document.getElementById('adminLeaveQueueBody');
-    if (leaveBody) {
-      leaveBody.innerHTML = '';
-      if (!data.leaveQueue || data.leaveQueue.length === 0) {
-        leaveBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No leave applications requiring verification for target date.</td></tr>';
-      } else {
-        data.leaveQueue.forEach(function (l) {
-          var tr = document.createElement('tr');
-          tr.innerHTML = `
-              <td><div class="fw-bold">${l.emp_name}</div><small class="text-muted">${l.emp_id}</small></td>
-              <td><span class="badge bg-light text-dark border">${l.team}</span></td>
-              <td><span class="badge bg-warning text-dark">${l.leave_type}</span></td>
-              <td><strong>${l.active_client || 'iMerit'}</strong><br><small class="text-muted">${l.active_project || 'Pravah'}</small></td>
-              <td>${l.perm_hours} hrs</td>
-              <td>
-                ${l.proof_url ? `<a href="${l.proof_url}" target="_blank" class="btn btn-sm btn-outline-primary py-0"><i class="fa-solid fa-file-pdf me-1"></i>View Document</a>` : '<span class="text-muted small">No attachment</span>'}
-              </td>
-            `;
-          leaveBody.appendChild(tr);
+      if (!emp && empParam !== undefined && empParam !== null) {
+        var paramStr = String(empParam).trim().toUpperCase();
+        emp = adminDataCache.employeeStatusList.find(function (e) {
+          return String(e.emp_id).trim().toUpperCase() === paramStr;
         });
       }
+      if (!emp) {
+        console.warn('inspectEmpWorkLogs: Employee record not found for param:', empParam);
+        return;
+      }
+
+      var nameElem = document.getElementById('inspectionEmpName') || document.getElementById('inspectEmpName');
+      if (nameElem) nameElem.textContent = emp.emp_name;
+      var idTeamElem = document.getElementById('inspectionEmpIdTeam');
+      if (idTeamElem) idTeamElem.textContent = emp.emp_id + ' • ' + (emp.team || 'Annotation') + ' • ' + (emp.work_mode || 'Office');
+
+      var badgesElem = document.getElementById('inspectionSummaryBadges');
+      if (badgesElem) {
+        var netShift = Number(emp.net_shift_hours || emp.total_shift_hours) || 0;
+        var workLogs = Number(emp.total_task_hours || emp.actual_worked_hours) || 0;
+        var leaveHrs = Number(emp.leave_hours) || 0;
+        badgesElem.innerHTML = `
+          <span class="badge bg-light text-dark border">Shift: <strong>${emp.shift_type || 'General'}</strong></span>
+          <span class="badge bg-light text-dark border">Days Worked: <strong>${emp.days_worked || 0}</strong></span>
+          ${leaveHrs > 0 ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Leave: <strong>${leaveHrs.toFixed(2)}h</strong></span>` : ''}
+          <span class="badge bg-info-subtle text-info border border-info-subtle">Net Shift: <strong>${netShift.toFixed(2)}h</strong></span>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Work Logged: <strong>${workLogs.toFixed(2)}h</strong></span>
+        `;
+      }
+
+      var tbody = document.getElementById('inspectionWorkLogsTableBody') || document.getElementById('empWorkLogsInspectionModalBody');
+      var tfoot = document.getElementById('inspectionWorkLogsTableFoot') || document.getElementById('empWorkLogsInspectionModalFoot');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (tfoot) tfoot.innerHTML = '';
+
+      var tasks = emp.tasks || [];
+      if (tasks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No individual work logs recorded for this associate in the selected period.</td></tr>';
+      } else {
+        var sumHours = 0;
+        var colorMap = {
+          'Production': 'bg-success-subtle text-success border border-success-subtle',
+          'Support': 'bg-info-subtle text-info border border-info-subtle',
+          'Client Meeting': 'bg-info-subtle text-info border border-info-subtle',
+          'Internal Meeting': 'bg-primary-subtle text-primary border border-primary-subtle',
+          'Training (Material Go-Through)': 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+          'Idle': 'bg-secondary-subtle text-secondary border border-secondary-subtle',
+          'Down Time': 'bg-danger-subtle text-danger border border-danger-subtle'
+        };
+
+        tasks.forEach(function (t, idx) {
+          var act = t.activity_type || 'Production';
+          var hrs = Number(t.actual_worked_hours) || 0;
+          sumHours += hrs;
+          var badgeClass = colorMap[act] || 'bg-light text-dark border';
+          var dateDisplay = t.work_start_time || t.created_at || t.normalizedDate || '--';
+
+          var tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="text-center text-muted fw-bold">${idx + 1}</td>
+            <td><small class="text-muted">${dateDisplay}</small></td>
+            <td>
+              <div class="fw-bold text-dark">${t.active_client || 'General'}</div>
+              <small class="text-muted">${t.active_project || 'Standard'}</small>
+            </td>
+            <td><span class="badge ${badgeClass}">${act}</span></td>
+            <td class="fw-bold text-primary text-end">${hrs.toFixed(2)} hrs</td>
+            <td class="small text-muted" style="max-width: 250px;">${t.user_remarks || '--'}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        if (tfoot) {
+          tfoot.innerHTML = `
+            <tr>
+              <td colspan="4" class="text-end text-dark">TOTAL LOGGED:</td>
+              <td class="text-end text-primary">${sumHours.toFixed(2)} hrs</td>
+              <td></td>
+            </tr>
+          `;
+        }
+      }
+
+      var modalElem = document.getElementById('empWorkLogsInspectionModal');
+      if (modalElem) {
+        var modal = bootstrap.Modal.getOrCreateInstance(modalElem);
+        modal.show();
+      }
     }
 
+    // Backward compatibility aliases
+    function inspectEmpTasks(param) {
+      inspectEmpWorkLogs(param);
+    }
 
     function inspectAdminTasks(param) {
-      if (typeof param === 'number') {
-        inspectEmpTasks(param);
-      } else if (typeof param === 'string' && adminDataCache && adminDataCache.employeeStatusList) {
-        var idx = adminDataCache.employeeStatusList.findIndex(function (e) { return e.emp_id === param || e.log_id === param; });
-        inspectEmpTasks(idx !== -1 ? idx : 0);
-      } else {
-        inspectEmpTasks(0);
-      }
+      inspectEmpWorkLogs(param);
     }
 
     function inspectAdminBreaks(param) {
-      if (typeof param === 'number') {
-        inspectEmpBreaks(param);
-      } else if (typeof param === 'string' && adminDataCache && adminDataCache.employeeStatusList) {
-        var idx = adminDataCache.employeeStatusList.findIndex(function (e) { return e.log_id === param || e.emp_id === param; });
-        if (idx !== -1) inspectEmpBreaks(idx);
-        else inspectEmpBreaks(0);
+      // Break-time logging removed
+    }
+
+    function openManagerManualAttendanceModal() {
+      var selectElem = document.getElementById('adminManualEmpSelect');
+      if (selectElem && adminDataCache && adminDataCache.employeeStatusList) {
+        selectElem.innerHTML = '<option value="">-- Select Associate --</option>';
+        adminDataCache.employeeStatusList.forEach(function (emp) {
+          var opt = document.createElement('option');
+          opt.value = emp.emp_id;
+          opt.textContent = emp.emp_name + ' (' + emp.emp_id + ') - ' + (emp.team || 'Annotation');
+          selectElem.appendChild(opt);
+        });
+      }
+
+      var dateElem = document.getElementById('adminManualDate');
+      var filterDate = document.getElementById('adminFilterDate');
+      if (dateElem) dateElem.value = filterDate ? filterDate.value : new Date().toISOString().substring(0, 10);
+
+      var modalElem = document.getElementById('adminManualAttendanceModal');
+      if (modalElem) {
+        var modal = bootstrap.Modal.getOrCreateInstance(modalElem);
+        modal.show();
+      }
+    }
+
+    function onAdminManualCategoryChange() {
+      var cat = document.getElementById('adminManualCategory') ? document.getElementById('adminManualCategory').value : '';
+      var permGroup = document.getElementById('adminManualPermGroup');
+      if (permGroup) {
+        if (cat === 'Permission') {
+          permGroup.classList.remove('d-none');
+        } else {
+          permGroup.classList.add('d-none');
+        }
+      }
+    }
+
+    function handleAdminManualAttendanceSubmit(e) {
+      e.preventDefault();
+      var empId = document.getElementById('adminManualEmpSelect').value;
+      var dateVal = document.getElementById('adminManualDate').value;
+      var category = document.getElementById('adminManualCategory').value;
+      var permHrs = (category === 'Permission') ? (Number(document.getElementById('adminManualPermHrs').value) || 2.0) : 0;
+      var remarks = document.getElementById('adminManualRemarks').value;
+
+      var btn = document.getElementById('adminManualSubmitBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Recording...';
+      }
+
+      var payload = {
+        emp_id: empId,
+        date: dateVal,
+        category: category,
+        leave_type: category,
+        permission_hours: permHrs,
+        notes: remarks,
+        remarks: remarks,
+        applied_by_manager: true
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = 'Record Attendance';
+            }
+            var modalElem = document.getElementById('adminManualAttendanceModal');
+            if (modalElem) {
+              var modal = bootstrap.Modal.getInstance(modalElem);
+              if (modal) modal.hide();
+            }
+            if (res && res.success) {
+              alert(res.message || 'Attendance recorded successfully.');
+              loadAdminDashboardData();
+            } else {
+              alert('Notice: ' + (res ? res.message : 'Completed.'));
+              loadAdminDashboardData();
+            }
+          })
+          .withFailureHandler(function (err) {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = 'Record Attendance';
+            }
+            alert('Error recording attendance: ' + err);
+          })
+          .applyLeaveOrPermission(payload);
       } else {
-        inspectEmpBreaks(0);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = 'Record Attendance';
+        }
+        var modalElem = document.getElementById('adminManualAttendanceModal');
+        if (modalElem) {
+          var modal = bootstrap.Modal.getInstance(modalElem);
+          if (modal) modal.hide();
+        }
+        alert('Simulated: Attendance recorded for ' + empId + ' on ' + dateVal);
+        loadAdminDashboardData();
+      }
+    }
+
+    function quickToggleScheduleStatus(empId, statusType) {
+      if (!empId) return;
+      var dateInput = document.getElementById('adminFilterDate');
+      var targetDate = (dateInput && dateInput.value) ? dateInput.value : new Date().toISOString().slice(0, 10);
+
+      var emp = (adminDataCache && adminDataCache.employeeStatusList) ? adminDataCache.employeeStatusList.find(function (e) {
+        return String(e.emp_id).trim().toUpperCase() === String(empId).trim().toUpperCase();
+      }) : null;
+
+      var currentStatus = emp ? String(emp.attendance_status || emp.shift_status || '').toUpperCase() : '';
+      var isCurrent = (currentStatus === statusType.toUpperCase());
+      var newStatus = isCurrent ? 'CLEAR' : statusType;
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (res && res.success) {
+              loadAdminDashboardData(true);
+            } else {
+              alert('Notice: ' + (res ? res.message : 'Status update completed.'));
+              loadAdminDashboardData(true);
+            }
+          })
+          .withFailureHandler(function (err) {
+            alert('Error updating schedule status: ' + err);
+          })
+          .setEmployeeScheduleStatus({
+            emp_id: empId,
+            date: targetDate,
+            status: newStatus
+          });
+      } else {
+        // Preview mode
+        if (emp) {
+          emp.attendance_status = (newStatus === 'CLEAR') ? 'NOT_CLOCKED_IN' : newStatus;
+          emp.shift_status = (newStatus === 'CLEAR') ? 'NOT_CLOCKED_IN' : newStatus;
+        }
+        renderAdminDashboard(adminDataCache);
       }
     }
 
@@ -2055,182 +2723,9 @@
       `;
     }
 
-    function inspectEmpTasks(empParam) {
-      if (!adminDataCache || !adminDataCache.employeeStatusList || adminDataCache.employeeStatusList.length === 0) return;
-      var emp = null;
-      if (typeof empParam === 'number') {
-        emp = adminDataCache.employeeStatusList[empParam];
-      }
-      if (!emp && empParam !== undefined && empParam !== null) {
-        var paramStr = String(empParam).trim().toUpperCase();
-        emp = adminDataCache.employeeStatusList.find(function (e) {
-          return String(e.emp_id).trim().toUpperCase() === paramStr || String(e.log_id || '').trim().toUpperCase() === paramStr;
-        });
-      }
-      if (!emp) {
-        console.warn('inspectEmpTasks: Employee record not found for param:', empParam);
-        return;
-      }
 
-      var titleElem = document.getElementById('taskDetailEmpName') || document.getElementById('taskModalTitle');
-      if (titleElem) titleElem.textContent = emp.emp_name + ' (' + emp.emp_id + ') - Shift Task Timeline';
 
-      // Render Visual Timeline Bar
-      renderShiftTimelineVisualizer('shiftTimelineContainer', emp.tasks || [], emp.breaks || [], emp.shift_start_time, emp.shift_end_time);
 
-      var tbody = document.getElementById('taskDetailModalBody');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-
-      var billableUnits = 0, billableWorked = 0, billableEarned = 0;
-      var trainingUnits = 0, trainingWorked = 0;
-
-      if (!emp.tasks || emp.tasks.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No task logs recorded for this employee.</td></tr>';
-        if (document.getElementById('modalBillableUnits')) document.getElementById('modalBillableUnits').textContent = '0 units';
-        if (document.getElementById('modalBillableWorked')) document.getElementById('modalBillableWorked').textContent = '0.00 hrs';
-        if (document.getElementById('modalBillableEarned')) document.getElementById('modalBillableEarned').textContent = '0.00 hrs';
-        if (document.getElementById('modalBillableSpeed')) document.getElementById('modalBillableSpeed').textContent = '⚡ 100%';
-
-        if (document.getElementById('modalTrainingUnits')) document.getElementById('modalTrainingUnits').textContent = '0 units';
-        if (document.getElementById('modalTrainingWorked')) document.getElementById('modalTrainingWorked').textContent = '0.00 hrs';
-        if (document.getElementById('modalTrainingEarned')) document.getElementById('modalTrainingEarned').innerHTML = '<span class="text-muted">0.00 hrs</span>';
-        if (document.getElementById('modalTrainingSpeed')) document.getElementById('modalTrainingSpeed').textContent = '🎓 Non-Billable';
-      } else {
-        emp.tasks.forEach(function (t) {
-          var units = Number(t.task_count) || 0;
-          var earned = Number(t.productive_hours || t.earned_hours) || 0;
-
-          var startT = formatAmPmTime(t.work_start_time || t.start_time);
-          var endT = formatAmPmTime(t.work_end_time || t.end_time);
-
-          var actualHrs = Number(t.actual_worked_hours) || 0;
-          if (!actualHrs && (t.work_start_time || t.start_time) && (t.work_end_time || t.end_time)) {
-            try {
-              var st = parseTimeStringToDate(t.work_start_time || t.start_time);
-              var et = parseTimeStringToDate(t.work_end_time || t.end_time);
-              if (st && et && et > st) actualHrs = (et.getTime() - st.getTime()) / (1000 * 60 * 60);
-            } catch (e) { }
-          }
-          if (isNaN(actualHrs) || !isFinite(actualHrs)) actualHrs = 0;
-
-          var actCat = String(t.activity_type || t.activity_category || '').toLowerCase();
-          var projName = String(t.project || t.project_name || t.active_project || '').toLowerCase();
-          var clientName = String(t.client || t.active_client || '').toLowerCase();
-
-          var isBench = (projName.indexOf('bench') !== -1 || projName.indexOf('floor management') !== -1 || projName.indexOf('unallocated') !== -1 || projName.indexOf('idle') !== -1)
-            || (clientName.indexOf('bench') !== -1 || clientName.indexOf('floor management') !== -1 || clientName.indexOf('unallocated') !== -1)
-            || (actCat.indexOf('bench') !== -1 || actCat.indexOf('training') !== -1 || actCat.indexOf('upskilling') !== -1);
-          var isDowntime = actCat.indexOf('downtime') !== -1 || actCat.indexOf('allocation') !== -1 || actCat.indexOf('waiting') !== -1;
-
-          var trackBadge = '<span class="badge bg-primary">Billable Production</span>';
-          var earnedDisplay = '0.00 hrs';
-          var speedBadge = '';
-
-          if (isBench) {
-            trackBadge = '<span class="badge bg-info text-dark" style="background-color:#0d9488!important;color:#fff!important;">Bench Training</span>';
-            trainingUnits += units;
-            trainingWorked += actualHrs;
-            earnedDisplay = '<span class="text-muted fw-normal">0.00 hrs <small class="text-muted">(Bench)</small></span>';
-            speedBadge = '<span class="badge bg-secondary-subtle text-secondary border">🎓 Non-Billable</span>';
-          } else if (isDowntime) {
-            trackBadge = '<span class="badge bg-warning text-dark">Technical Downtime</span>';
-            earnedDisplay = '<span class="text-muted fw-normal">0.00 hrs <small class="text-muted">(Downtime)</small></span>';
-            speedBadge = '<span class="badge bg-warning-subtle text-dark border">⏳ Idle / Wait</span>';
-          } else {
-            billableUnits += units;
-            billableWorked += actualHrs;
-            billableEarned += earned;
-            earnedDisplay = `<span class="text-success fw-bold">${earned.toFixed(2)} hrs</span>`;
-
-            var speedPct = Number(t.speed_efficiency_pct) || (actualHrs > 0 ? Math.round((earned / actualHrs) * 100) : 100);
-            var speedBadgeClass = speedPct >= 100 ? 'bg-success-subtle text-success border border-success-subtle' : (speedPct >= 80 ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-warning-subtle text-dark border border-warning-subtle');
-            speedBadge = `<span class="badge ${speedBadgeClass}">⚡ ${speedPct}% Billable</span>`;
-          }
-
-          var tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td><strong>${t.active_client || t.client || 'N/A'}</strong><br><small class="text-muted">${t.active_project || t.project || 'N/A'}</small></td>
-            <td>${trackBadge}</td>
-            <td class="fw-bold">${units}</td>
-            <td><span class="small fw-semibold text-dark"><i class="fa-regular fa-clock text-primary me-1"></i>${startT} - ${endT}</span></td>
-            <td class="fw-bold">${actualHrs.toFixed(2)} hrs</td>
-            <td class="fw-bold">${earnedDisplay}</td>
-            <td>${speedBadge}</td>
-            <td><small>${t.user_remarks || 'NA'}</small></td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-        var billableSpeedPct = billableWorked > 0 ? Math.round((billableEarned / billableWorked) * 100) : 100;
-
-        if (document.getElementById('modalBillableUnits')) document.getElementById('modalBillableUnits').textContent = billableUnits + ' units';
-        if (document.getElementById('modalBillableWorked')) document.getElementById('modalBillableWorked').textContent = billableWorked.toFixed(2) + ' hrs';
-        if (document.getElementById('modalBillableEarned')) document.getElementById('modalBillableEarned').textContent = billableEarned.toFixed(2) + ' hrs';
-        if (document.getElementById('modalBillableSpeed')) document.getElementById('modalBillableSpeed').textContent = '⚡ ' + billableSpeedPct + '% Speed';
-
-        if (document.getElementById('modalTrainingUnits')) document.getElementById('modalTrainingUnits').textContent = trainingUnits + ' units';
-        if (document.getElementById('modalTrainingWorked')) document.getElementById('modalTrainingWorked').textContent = trainingWorked.toFixed(2) + ' hrs';
-        if (document.getElementById('modalTrainingEarned')) document.getElementById('modalTrainingEarned').innerHTML = '<span class="text-muted">0.00 hrs</span>';
-        if (document.getElementById('modalTrainingSpeed')) document.getElementById('modalTrainingSpeed').textContent = '🎓 Non-Billable';
-      }
-
-      var modalElem = document.getElementById('taskDetailModal');
-      if (modalElem) {
-        modalElem.style.zIndex = '1085';
-        var modal = bootstrap.Modal.getOrCreateInstance(modalElem);
-        modal.show();
-        setTimeout(function () {
-          var backdrops = document.querySelectorAll('.modal-backdrop');
-          if (backdrops.length > 1) {
-            backdrops[backdrops.length - 1].style.zIndex = '1080';
-          }
-        }, 100);
-      }
-    }
-
-    function openAhtModal() {
-      var modal = new bootstrap.Modal(document.getElementById('ahtModal'));
-      modal.show();
-    }
-
-    function handleSaveAht(e) {
-      e.preventDefault();
-      var client = document.getElementById('ahtClientName').value;
-      var proj = document.getElementById('ahtProjectName').value;
-      var actType = document.getElementById('ahtActivityType') ? document.getElementById('ahtActivityType').value : 'Production Work';
-      var aht = document.getElementById('ahtMinutesVal').value;
-      var billable = document.getElementById('ahtBillableCheck').checked;
-      var isActive = document.getElementById('ahtIsActiveCheck') ? document.getElementById('ahtIsActiveCheck').checked : true;
-      var notes = document.getElementById('ahtNotesInput') ? document.getElementById('ahtNotesInput').value : '';
-
-      var payload = {
-        client_name: client,
-        project_name: proj,
-        activity_type: actType,
-        aht_minutes: aht,
-        is_billable: billable,
-        is_active: isActive,
-        notes: notes
-      };
-
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(function (res) {
-            var modalElem = document.getElementById('ahtModal');
-            var modal = bootstrap.Modal.getInstance(modalElem) || bootstrap.Modal.getOrCreateInstance(modalElem);
-            if (modal) modal.hide();
-            if (res && res.message) alert(res.message);
-            loadAdminDashboardData();
-          })
-          .updateClientProjectMaster(payload);
-      } else {
-        alert('Benchmark updated (Preview Mode):\n' + JSON.stringify(payload, null, 2));
-        var modalElem = document.getElementById('ahtModal');
-        var modal = bootstrap.Modal.getInstance(modalElem) || bootstrap.Modal.getOrCreateInstance(modalElem);
-        if (modal) modal.hide();
-      }
-    }
 
     // ==========================================
     // ADMIN DASHBOARD COLUMN & CONDITION FILTERING ENGINE
@@ -2240,8 +2735,8 @@
     var currentActiveColIdx = null;
 
     var ADMIN_COL_NAMES = [
-      "EMPLOYEE", "TEAM / MODE", "SHIFT TIMINGS", "BREAK MINS", "PERM (HRS)", 
-      "NET WORKED", "EARNED HRS", "LEAKAGE HRS", "IDLE HRS", "BLOCKED HRS", 
+      "EMPLOYEE", "TEAM / MODE", "SHIFT TIMINGS", "BREAK MINS", "PERM (HRS)",
+      "NET WORKED", "EARNED HRS", "LEAKAGE HRS", "IDLE HRS", "BLOCKED HRS",
       "BENCH HRS", "STATUS", "ACTION"
     ];
 
@@ -2341,8 +2836,8 @@
         }
         if (typeof ADMIN_COL_NAMES === 'undefined' || !ADMIN_COL_NAMES) {
           ADMIN_COL_NAMES = [
-            "EMPLOYEE", "TEAM / MODE", "SHIFT TIMINGS", "BREAK MINS", "PERM (HRS)", 
-            "NET WORKED", "EARNED HRS", "LEAKAGE HRS", "IDLE HRS", "BLOCKED HRS", 
+            "EMPLOYEE", "TEAM / MODE", "SHIFT TIMINGS", "BREAK MINS", "PERM (HRS)",
+            "NET WORKED", "EARNED HRS", "LEAKAGE HRS", "IDLE HRS", "BLOCKED HRS",
             "BENCH HRS", "STATUS", "ACTION"
           ];
         }
@@ -2786,82 +3281,77 @@
     function escapeCsvCell(val) {
       if (val === null || val === undefined) return '""';
       var str = String(val);
-      str = str.replace(/"/g, '""');
+      str = str.split('"').join('""');
       return '"' + str + '"';
     }
 
     function exportAdminCsv() {
-      var filteredList = getFilteredAdminStaffList();
-      if (!filteredList || filteredList.length === 0) {
+      if (!adminDataCache || !adminDataCache.employeeStatusList || adminDataCache.employeeStatusList.length === 0) {
         alert("No employee records found matching active filter criteria to export.");
         return;
       }
 
-      var dateVal = document.getElementById('adminFilterDate') ? document.getElementById('adminFilterDate').value : new Date().toISOString().substring(0, 10);
-      var statusVal = document.getElementById('adminFilterStatus') ? document.getElementById('adminFilterStatus').value : 'ALL';
-      var clientVal = document.getElementById('adminFilterClient') ? document.getElementById('adminFilterClient').value : 'ALL';
-      var projVal = document.getElementById('adminFilterProject') ? document.getElementById('adminFilterProject').value : 'ALL';
+      var dateRangeLabel = (adminDataCache.dateRange && adminDataCache.dateRange.label) ? adminDataCache.dateRange.label : (adminDataCache.targetDate || 'Today');
+      var period = adminDataCache.period || adminPeriod || 'day';
 
       var headers = [
         "Emp ID",
         "Emp Name",
-        "Team / Department",
+        "Team",
         "Work Mode",
-        "Assigned Client",
-        "Assigned Project",
-        "Shift Timings (Start - End)",
-        "Total Break Mins",
-        "Permission Hrs",
-        "Net Worked Hrs",
-        "Earned Standard Hrs",
-        "Leakage Loss Hrs",
-        "Idle Hrs",
-        "Blocked Hrs",
-        "Bench Hrs",
-        "Speed Efficiency %",
-        "Shift Status",
-        "Attendance Status",
-        "Drive Proof URL",
-        "User Remarks"
+        "Shift Type",
+        "Primary Client",
+        "Primary Project",
+        "Days Worked",
+        "Days Leave",
+        "Leave Hours",
+        "Net Shift Working Hours (1h Daily Break Auto-Deducted)",
+        "Total Work Log Hours",
+        "Production Hours",
+        "Support Hours",
+        "Client Meeting Hours",
+        "Internal Meeting Hours",
+        "Training Hours",
+        "Idle Hours",
+        "Down Time Hours"
       ];
 
       var csvRows = [headers.map(escapeCsvCell).join(",")];
 
-      filteredList.forEach(function (e) {
-        var empTaskActual = Number(e.actual_worked_hours) || 0;
-        var empEarned = Number(e.earned_hours) || 0;
-        var empSpeedPct = empTaskActual > 0 ? Math.round((empEarned / empTaskActual) * 100) : (e.tasks_count > 0 ? 100 : 0);
+      adminDataCache.employeeStatusList.forEach(function (emp) {
+        var actB = emp.activity_breakdown || {};
+        var prodHrs = Number(actB['Production'] || 0).toFixed(2);
+        var suppHrs = Number(actB['Support'] || 0).toFixed(2);
+        var clientMeetHrs = Number(actB['Client Meeting'] || 0).toFixed(2);
+        var internalMeetHrs = Number(actB['Internal Meeting'] || 0).toFixed(2);
+        var trainingHrs = Number(actB['Training (Material Go-Through)'] || 0).toFixed(2);
+        var idleHrs = Number(actB['Idle'] || 0).toFixed(2);
+        var downtimeHrs = Number(actB['Down Time'] || 0).toFixed(2);
 
-        var isLeaveRowExport = (['PL', 'UL', 'HL', 'ABSENT', 'LEAVE_CLOSED'].indexOf(String(e.attendance_status || '').toUpperCase()) !== -1 || String(e.shift_status || '').toUpperCase() === 'LEAVE_CLOSED');
-        var isFullLeaveExport = (['PL', 'UL', 'ABSENT', 'LEAVE_CLOSED'].indexOf(String(e.attendance_status || '').toUpperCase()) !== -1 || String(e.shift_status || '').toUpperCase() === 'LEAVE_CLOSED');
-        var timings = isFullLeaveExport ? '--:--' : ((e.shift_start_time || '--:--') + ' - ' + (e.shift_end_time || '--:--'));
-        var exportWorked = isFullLeaveExport ? 0 : (String(e.attendance_status || '').toUpperCase() === 'HL' ? Math.min(4.50, Number(e.total_shift_hours) || 0) : (Number(e.total_shift_hours) || 0));
-
-        var activeClient = e.default_client || e.client || (e.tasks && e.tasks.length > 0 ? e.tasks[0].active_client : '--');
-        var activeProject = e.default_project || e.project || (e.tasks && e.tasks.length > 0 ? e.tasks[0].active_project : '--');
-        var remarks = e.user_remarks || (e.tasks && e.tasks.length > 0 ? e.tasks.map(function (t) { return t.user_remarks; }).filter(Boolean).join(" | ") : '');
+        var netShift = Number(emp.net_shift_hours || emp.total_shift_hours || 0).toFixed(2);
+        var leaveHrs = Number(emp.leave_hours || 0).toFixed(2);
+        var workLogs = Number(emp.total_task_hours || emp.actual_worked_hours || 0).toFixed(2);
 
         var row = [
-          e.emp_id || '',
-          e.emp_name || '',
-          e.team || '',
-          e.work_mode || '',
-          activeClient || '',
-          activeProject || '',
-          timings,
-          isFullLeaveExport ? 0 : (e.total_break_minutes || 0),
-          (isLeaveRowExport ? 0 : (Number(e.permission_hours) || 0)).toFixed(2),
-          exportWorked.toFixed(2),
-          (isFullLeaveExport ? 0 : (Number(e.earned_hours) || 0)).toFixed(2),
-          (isFullLeaveExport ? 0 : (Number(e.leakage_hours) || 0)).toFixed(2),
-          (isFullLeaveExport ? 0 : (Number(e.idle_hours) || 0)).toFixed(2),
-          (isFullLeaveExport ? 0 : (Number(e.blocked_hours) || 0)).toFixed(2),
-          (isFullLeaveExport ? 0 : (Number(e.bench_hours) || 0)).toFixed(2),
-          empSpeedPct + '%',
-          e.shift_status || '',
-          e.attendance_status || '',
-          e.proof_url || '',
-          remarks
+          emp.emp_id || '',
+          emp.emp_name || '',
+          emp.team || 'Annotation',
+          emp.work_mode || 'Office',
+          emp.shift_type || 'General',
+          emp.primary_client || 'General',
+          emp.primary_project || 'Standard',
+          emp.days_worked || 0,
+          emp.days_leave || 0,
+          leaveHrs,
+          netShift,
+          workLogs,
+          prodHrs,
+          suppHrs,
+          clientMeetHrs,
+          internalMeetHrs,
+          trainingHrs,
+          idleHrs,
+          downtimeHrs
         ];
 
         csvRows.push(row.map(escapeCsvCell).join(","));
@@ -2869,7 +3359,94 @@
 
       var csvString = csvRows.join("\r\n");
       var blob = new Blob(["\ufeff" + csvString], { type: 'text/csv;charset=utf-8;' });
-      var fileName = `Hurix_LiveShift_Report_${dateVal}_${statusVal}_Client-${clientVal}_Proj-${projVal}.csv`;
+      var fileName = "Consolidated_Work_Logs_Report_" + period + "_" + dateRangeLabel.replace(/[^a-zA-Z0-9]/g, '_') + ".csv";
+
+      if (navigator.msSaveBlob) {
+        navigator.msSaveBlob(blob, fileName);
+      } else {
+        var link = document.createElement("a");
+        if (link.download !== undefined) {
+          var url = URL.createObjectURL(blob);
+          link.setAttribute("href", url);
+          link.setAttribute("download", fileName);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 500);
+        }
+      }
+    }
+
+    function exportSummaryTableCsv() {
+      if (!adminDataCache || !adminDataCache.summaryTable || !adminDataCache.summaryTable.rows || adminDataCache.summaryTable.rows.length === 0) {
+        alert("No executive summary records found matching active filter criteria to export.");
+        return;
+      }
+
+      var dateRangeLabel = (adminDataCache.dateRange && adminDataCache.dateRange.label) ? adminDataCache.dateRange.label : (adminDataCache.targetDate || 'Today');
+      var period = adminDataCache.period || adminPeriod || 'day';
+
+      var headers = [
+        "Month",
+        "Project Name",
+        "Prod Head Count",
+        "Support Head Count",
+        "Total Available Production Hrs",
+        "Active production Hours",
+        "Training (Client + Internal)",
+        "Idle",
+        "Down Time",
+        "Meeting (Client + Internal)",
+        "Leave",
+        "Production Utilization %",
+        "Non Productive Hours %"
+      ];
+
+      var csvRows = [headers.map(escapeCsvCell).join(",")];
+
+      adminDataCache.summaryTable.rows.forEach(function (r) {
+        var row = [
+          r.period || '',
+          r.projectName || '',
+          r.prodHeadCount,
+          r.supportHeadCount,
+          r.totalAvailableProdHrs,
+          r.activeProductionHrs,
+          r.trainingHrs !== undefined ? r.trainingHrs : 0,
+          r.idleHrs !== undefined ? r.idleHrs : 0,
+          r.downTimeHrs || 0,
+          r.meetingHrs !== undefined ? r.meetingHrs : 0,
+          r.leaveHrs !== undefined ? r.leaveHrs : 0,
+          (Number(r.productionUtilizationPct) || 0).toFixed(2) + '%',
+          (Number(r.nonProductiveHoursPct) || 0).toFixed(2) + '%'
+        ];
+        csvRows.push(row.map(escapeCsvCell).join(","));
+      });
+
+      if (adminDataCache.summaryTable.total) {
+        var tot = adminDataCache.summaryTable.total;
+        var totRow = [
+          "Total",
+          "",
+          tot.prodHeadCount !== undefined ? tot.prodHeadCount : 0,
+          tot.supportHeadCount !== undefined ? tot.supportHeadCount : 0,
+          tot.totalAvailableProdHrs !== undefined ? tot.totalAvailableProdHrs : 0,
+          tot.activeProductionHrs !== undefined ? tot.activeProductionHrs : 0,
+          tot.trainingHrs !== undefined ? tot.trainingHrs : 0,
+          tot.idleHrs !== undefined ? tot.idleHrs : 0,
+          tot.downTimeHrs || 0,
+          tot.meetingHrs !== undefined ? tot.meetingHrs : 0,
+          tot.leaveHrs !== undefined ? tot.leaveHrs : 0,
+          (Number(tot.productionUtilizationPct) || 0).toFixed(2) + '%',
+          (Number(tot.nonProductiveHoursPct) || 0).toFixed(2) + '%'
+        ];
+        csvRows.push(totRow.map(escapeCsvCell).join(","));
+      }
+
+      var csvString = csvRows.join("\r\n");
+      var blob = new Blob(["\ufeff" + csvString], { type: 'text/csv;charset=utf-8;' });
+      var fileName = "Executive_Productivity_Summary_" + period + "_" + dateRangeLabel.replace(/[^a-zA-Z0-9]/g, '_') + ".csv";
 
       if (navigator.msSaveBlob) {
         navigator.msSaveBlob(blob, fileName);
@@ -3313,7 +3890,7 @@
             if (res && res.success) {
               if (typeof showToast === 'function') showToast(res.message);
               else alert(res.message);
-              loadAdminDashboard();
+              loadAdminDashboardData();
             } else {
               alert('Error: ' + (res ? res.message : 'Failed to record leave.'));
             }
@@ -3333,97 +3910,16 @@
           if (modal) modal.hide();
         }
         alert('Simulated: Marked leave for ' + empId + ' on ' + targetDate + ' as ' + category);
-        loadAdminDashboard();
+        loadAdminDashboardData();
       }
     }
 
-    function onTaskCountChange() {
-      var count = Number(document.getElementById('taskCountInput').value);
-      var remarksInput = document.getElementById('taskRemarksInput');
-      var remarksLabel = document.getElementById('remarksLabel');
-      if (!remarksInput) return;
-
-      remarksInput.required = false;
-      if (remarksLabel) remarksLabel.textContent = 'Remarks / Notes';
+    // Compatibility alias
+    function loadAdminDashboard() {
+      loadAdminDashboardData();
     }
 
-    function inspectEmpBreaks(empParam) {
-      if (!adminDataCache || !adminDataCache.employeeStatusList || adminDataCache.employeeStatusList.length === 0) return;
-      var emp = null;
-      if (typeof empParam === 'number') {
-        emp = adminDataCache.employeeStatusList[empParam];
-      }
-      if (!emp && empParam !== undefined && empParam !== null) {
-        var paramStr = String(empParam).trim().toUpperCase();
-        emp = adminDataCache.employeeStatusList.find(function (e) {
-          return String(e.emp_id).trim().toUpperCase() === paramStr || String(e.log_id || '').trim().toUpperCase() === paramStr;
-        });
-      }
-      if (!emp) {
-        console.warn('inspectEmpBreaks: Employee record not found for param:', empParam);
-        return;
-      }
 
-      var empTitle = document.getElementById('breakDetailEmpName');
-      if (empTitle) empTitle.textContent = emp.emp_name + ' (' + emp.emp_id + ') - Mapped Break Logs';
-      var tbody = document.getElementById('breakDetailModalBody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3"><i class="fa-solid fa-spinner fa-spin me-2"></i>Fetching Break Logs...</td></tr>';
-
-      var modalElem = document.getElementById('breakDetailModal');
-      if (modalElem) {
-        var modal = bootstrap.Modal.getOrCreateInstance(modalElem);
-        modal.show();
-      }
-
-      var selectedDate = document.getElementById('adminFilterDate') ? document.getElementById('adminFilterDate').value : '';
-
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(function (breaks) {
-            renderBreakLogsModal(breaks || []);
-          })
-          .getEmpBreakLogs(emp.log_id, emp.emp_id, selectedDate);
-      } else {
-        renderBreakLogsModal([
-          { break_start_time: '11:15:00', break_end_time: '11:30:00', duration_minutes: 15, break_status: 'COMPLETED' },
-          { break_start_time: '13:30:00', break_end_time: '14:15:00', duration_minutes: 45, break_status: 'COMPLETED' }
-        ]);
-      }
-    }
-
-    function renderBreakLogsModal(breaks) {
-      var tbody = document.getElementById('breakDetailModalBody');
-      tbody.innerHTML = '';
-
-      if (!breaks || breaks.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No break logs recorded for this shift.</td></tr>';
-        return;
-      }
-
-      var totalMins = 0;
-      breaks.forEach(function (b, idx) {
-        var dur = Number(b.duration_minutes) || 0;
-        totalMins += dur;
-        var tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><strong>Break #${idx + 1}</strong></td>
-          <td>${b.break_start_time || '--:--'}</td>
-          <td>${b.break_end_time || 'Active...'}</td>
-          <td class="fw-bold text-primary">${dur} mins</td>
-          <td><span class="badge ${b.break_status === 'COMPLETED' ? 'bg-success' : 'bg-warning text-dark'}">${b.break_status}</span></td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      var totalTr = document.createElement('tr');
-      totalTr.className = 'table-light fw-bold';
-      totalTr.innerHTML = `
-        <td colspan="3" class="text-end">Total Shift Break Duration:</td>
-        <td class="text-primary">${totalMins} mins</td>
-        <td></td>
-      `;
-      tbody.appendChild(totalTr);
-    }
 
   </script>
 

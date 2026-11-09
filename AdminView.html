@@ -1,323 +1,490 @@
-<!-- UNIFIED MANAGEMENT & EXECUTIVE DASHBOARD (AdminView) -->
+<!-- CONSOLIDATED OPERATIONS & WORK LOGS DASHBOARD (AdminView) -->
 <div id="adminViewWrapper">
 
   <!-- TOP MANAGEMENT CONSOLE HEADER -->
-  <div class="card card-hurix p-2 mb-3 shadow-sm">
+  <div class="card card-hurix p-3 mb-3 shadow-sm">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
       <div class="d-flex align-items-center">
-        <h5 class="fw-bold text-primary mb-0 ms-2">
-          <i class="fa-solid fa-tower-broadcast me-2"></i>Live Shift & Staff Monitor
+        <h5 class="fw-bold text-primary mb-0">
+          <i class="fa-solid fa-chart-pie me-2"></i>Operations & Work Logs Consolidated Dashboard
         </h5>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <a href="https://docs.google.com/spreadsheets/d/1ykTtFBSf7PE6MPdTeO0h2xSU8EKkwD__U0UkciQC2t8/edit?gid=670545439#gid=670545439"
-          target="_blank" class="btn btn-success btn-sm fw-bold shadow-sm">
-          <i class="fa-solid fa-file-excel me-1"></i>Open Base Sheet
-        </a>
-        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2">
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-3 px-2 py-1 small">
           <i class="fa-solid fa-shield-halved me-1"></i>Management Console
         </span>
       </div>
+      <div class="d-flex align-items-center gap-2">
+        <button onclick="openManagerManualAttendanceModal()" class="btn btn-outline-primary btn-sm fw-semibold">
+          <i class="fa-solid fa-user-pen me-1"></i>Mark Leave
+        </button>
+        <button onclick="exportAdminCsv()" class="btn btn-outline-success btn-sm fw-semibold">
+          <i class="fa-solid fa-file-csv me-1"></i>Export Consolidated CSV
+        </button>
+        <button onclick="loadAdminDashboardData(true)" class="btn btn-hurix btn-sm">
+          <i id="adminSyncIcon" class="fa-solid fa-rotate me-1"></i>Refresh Live
+        </button>
+        <a id="adminMasterSheetLink" href="https://docs.google.com/spreadsheets/d/1ykTtFBSf7PE6MPdTeO0h2xSU8EKkwD__U0UkciQC2t8/edit?gid=670545439#gid=670545439"
+          target="_blank" class="btn btn-light btn-sm text-secondary border shadow-sm" title="Open Master Google Sheet">
+          <i class="fa-solid fa-file-excel text-success me-1"></i>Sheet
+        </a>
+      </div>
     </div>
   </div>
 
-  <!-- ========================================================================= -->
-  <!-- SECTION 1: LIVE SHIFT & STAFF MONITOR -->
-  <!-- ========================================================================= -->
-  <div id="adminLiveSection">
-
-    <!-- ADMIN LEVEL SCORECARD CARDS GRID -->
-    <div class="kpi-row-container mb-4">
-      <!-- Card 1: Total Resources -->
-      <div class="kpi-card-item" style="border-left-color: #0082c8; cursor: pointer;" onclick="filterByKpi('ALL')"
-        title="Click to filter: Total Resources">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="kpi-sub-text text-uppercase fw-bold" style="font-size: 0.65rem; color: #475569;">Total Resources</span>
-          <div class="kpi-icon-pill" style="background: #e0f2fe; color: #0082c8;">
-            <i class="fa-solid fa-users"></i>
-          </div>
-        </div>
-        <div id="adminTotalStaffVal" class="kpi-val-text text-dark">0</div>
-        <div class="kpi-sub-text"><i class="fa-solid fa-id-badge me-1" style="color: #0082c8;"></i>Active Staff</div>
-      </div>
-
-      <!-- Card 2: Clocked In -->
-      <div class="kpi-card-item" style="border-left-color: #10b981; cursor: pointer;"
-        onclick="filterByKpi('CLOCKED_IN_TODAY')" title="Click to filter: Clocked In">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="kpi-sub-text text-uppercase fw-bold" style="font-size: 0.65rem; color: #475569;">Clocked In</span>
-          <div class="kpi-icon-pill" style="background: #d1fae5; color: #10b981;">
-            <i class="fa-solid fa-user-check"></i>
-          </div>
-        </div>
-        <div id="adminClockedInSub" class="kpi-val-text" style="color: #10b981;">0</div>
-        <div class="kpi-sub-text"><i class="fa-solid fa-signal me-1" style="color: #10b981;"></i>Active Shift</div>
-      </div>
-
-      <!-- Card 3: Pending -->
-      <div class="kpi-card-item" style="border-left-color: #f59e0b; cursor: pointer;"
-        onclick="filterByKpi('NOT_CLOCKED_IN')" title="Click to filter: Pending">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="kpi-sub-text text-uppercase fw-bold" style="font-size: 0.65rem; color: #475569;">Pending</span>
-          <div class="kpi-icon-pill" style="background: #fef3c7; color: #d97706;">
-            <i class="fa-solid fa-user-slash"></i>
-          </div>
-        </div>
-        <div id="adminNotClockedIn" class="kpi-val-text" style="color: #d97706;">0</div>
-        <div class="kpi-sub-text"><i class="fa-solid fa-clock me-1" style="color: #d97706;"></i>Yet to Clock In</div>
-      </div>
-
-      <!-- Card 4: On Leave -->
-      <div class="kpi-card-item" style="border-left-color: #ef4444; min-width: 140px; cursor: pointer;"
-        onclick="filterByKpi('LEAVE_CLOSED')" title="Click to filter: On Leave">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="kpi-sub-text text-uppercase fw-bold" style="font-size: 0.65rem; color: #475569;">On Leave</span>
-          <div class="kpi-icon-pill" style="background: #fee2e2; color: #dc2626;">
-            <i class="fa-solid fa-calendar-xmark"></i>
-          </div>
-        </div>
-        <div class="d-flex align-items-baseline gap-1">
-          <span id="adminOnLeaveCnt" class="kpi-val-text" style="color: #dc2626;">0</span>
-          <span class="small text-muted" style="font-size:0.7rem;">(<span id="adminShrinkageRate" class="fw-bold"
-              style="color: #dc2626;">0.00%</span>)</span>
-        </div>
-        <div class="d-flex align-items-center flex-wrap gap-1 mt-1" style="font-size:0.6rem;">
-          <span class="badge bg-primary-subtle text-primary p-1 py-0">PL:<strong id="adminPL">0</strong></span>
-          <span class="badge bg-danger-subtle text-danger p-1 py-0">UL:<strong id="adminUL">0</strong></span>
-          <span class="badge bg-warning-subtle text-dark p-1 py-0">HL:<strong id="adminHL">0</strong></span>
-          <span class="badge bg-purple-subtle text-purple p-1 py-0"
-            style="background-color:#f3e8ff;color:#7e22ce;">P:<strong id="adminPerm">0</strong></span>
-        </div>
-      </div>
-
-      <!-- Card 5: Net Worked (Shift Hours) -->
-      <div class="kpi-card-item" style="border-left-color: #0284c7;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="kpi-sub-text text-uppercase fw-bold" style="font-size: 0.65rem; color: #475569;">Net Worked</span>
-          <div class="kpi-icon-pill" style="background: #e0f2fe; color: #0284c7;">
-            <i class="fa-solid fa-business-time"></i>
-          </div>
-        </div>
-        <div id="adminActualWorkedHours" class="kpi-val-text" style="color: #0284c7;">0.00 hrs</div>
-        <div class="kpi-sub-text"><i class="fa-solid fa-clock me-1" style="color: #0284c7;"></i>Shift Net Hours</div>
-      </div>
-
-      <!-- Card 6: Gross Worked (Task Log Hours) -->
-      <div class="kpi-card-item" style="border-left-color: #0d9488;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="kpi-sub-text text-uppercase fw-bold" style="font-size: 0.65rem; color: #475569;">Gross Worked</span>
-          <div class="kpi-icon-pill" style="background: #ccfbf1; color: #0d9488;">
-            <i class="fa-solid fa-list-check"></i>
-          </div>
-        </div>
-        <div id="adminTotalTaskHours" class="kpi-val-text" style="color: #0d9488;">0.00 hrs</div>
-        <div class="kpi-sub-text"><i class="fa-solid fa-trophy me-1" style="color: #10b981;"></i>Earned: <strong
-            id="adminEarnedHours" class="text-success ms-1">0.00 hrs</strong></div>
-      </div>
-
-      <!-- Card 7: Leakage Loss -->
-      <div class="kpi-card-item" style="border-left-color: #dc2626;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="kpi-sub-text text-uppercase fw-bold" style="font-size: 0.65rem; color: #475569;">Leakage Loss</span>
-          <div class="kpi-icon-pill" style="background: #fee2e2; color: #dc2626;">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-          </div>
-        </div>
-        <div id="adminLeakageHours" class="kpi-val-text" style="color: #dc2626;">0.00 hrs</div>
-        <div class="kpi-sub-text"><i class="fa-solid fa-arrow-trend-down me-1" style="color: #dc2626;"></i>Output Gap</div>
-      </div>
-
-      <!-- Card 8: Blocked / Bench -->
-      <div class="kpi-card-item" style="border-left-color: #7e22ce; min-width: 130px;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="kpi-sub-text text-uppercase fw-bold" style="font-size: 0.68rem; color: #475569;">Blocked / Bench</span>
-          <div class="kpi-icon-pill" style="background: #f3e8ff; color: #7e22ce;">
-            <i class="fa-solid fa-ban"></i>
-          </div>
-        </div>
-        <div class="d-flex align-items-baseline gap-1">
-          <span id="adminTotalBlockedHours" class="fs-5 fw-bold" style="color:#7e22ce;">0.00 hrs</span>
-          <span class="small text-muted">/ <span id="adminTotalBenchHours" class="text-secondary fw-bold">0.00 hrs</span></span>
-        </div>
-        <div class="kpi-sub-text"><i class="fa-solid fa-pause me-1" style="color: #d97706;"></i>Idle: <strong
-            id="adminTotalIdleHours" class="text-warning ms-1">0.00 hrs</strong></div>
-      </div>
-    </div>
-
-    <!-- CONTROL & FILTER BAR -->
-    <div class="card card-hurix p-3 mb-3">
-      <div class="row g-3 align-items-center">
-        <div class="col-md-2">
-          <label class="form-label small fw-bold mb-1"><i class="fa-regular fa-calendar me-1"></i>Target Date</label>
-          <input type="date" id="adminFilterDate" class="form-control form-control-sm"
-            onchange="loadAdminDashboardData()">
-        </div>
-
-        <div class="col-md-2">
-          <label class="form-label small fw-bold mb-1"><i class="fa-solid fa-building me-1"></i>Client</label>
-          <select id="adminFilterClient" class="form-select form-select-sm" onchange="onAdminClientChange()">
-            <option value="ALL">All Clients</option>
-          </select>
-        </div>
-
-        <div class="col-md-2">
-          <label class="form-label small fw-bold mb-1"><i class="fa-solid fa-folder me-1"></i>Project</label>
-          <select id="adminFilterProject" class="form-select form-select-sm" onchange="loadAdminDashboardData()">
-            <option value="ALL">All Projects</option>
-          </select>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label small fw-bold mb-1"><i class="fa-solid fa-magnifying-glass me-1"></i>Search Resource</label>
-          <div class="input-group input-group-sm">
-            <span class="input-group-text bg-white"><i class="fa-solid fa-user small"></i></span>
-            <input type="text" id="adminSearchInput" class="form-control" placeholder="Search by name, ID or email..."
-              oninput="filterEmployeeTable()">
-          </div>
-        </div>
-
-        <div class="col-md-3 text-end pt-3">
-          <button onclick="loadAdminDashboardData(true)" class="btn btn-hurix btn-sm me-2">
-            <i class="fa-solid fa-rotate me-1"></i>Refresh Live
+  <!-- CONSOLIDATED PERIOD SELECTOR & CONTROL BAR -->
+  <div class="card card-hurix p-3 mb-4 shadow-sm">
+    <div class="row g-2 align-items-center">
+      <!-- Period Switcher: Day, Week, Month -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small fw-bold mb-1"><i class="fa-solid fa-calendar-week me-1"></i>Period</label>
+        <div class="btn-group w-100" role="group" aria-label="Period Toggle">
+          <button type="button" id="periodBtn-day" class="btn btn-sm btn-hurix fw-semibold active" onclick="setAdminPeriod('day')">
+            Day
           </button>
-          <button onclick="exportAdminCsv()" class="btn btn-outline-success btn-sm">
-            <i class="fa-solid fa-file-csv me-1"></i>Export Daily CSV
+          <button type="button" id="periodBtn-week" class="btn btn-sm btn-outline-secondary fw-semibold" onclick="setAdminPeriod('week')">
+            Week
+          </button>
+          <button type="button" id="periodBtn-month" class="btn btn-sm btn-outline-secondary fw-semibold" onclick="setAdminPeriod('month')">
+            Month
           </button>
         </div>
       </div>
 
-      <!-- SECONDARY QUICK KPI FILTER BUTTONS RIBBON -->
-      <div class="d-flex align-items-center gap-2 mt-3 pt-2 border-top flex-wrap">
-        <span class="small fw-bold text-muted me-1">Quick Filter Status:</span>
-        <button class="btn btn-sm btn-outline-primary active py-0 px-2" id="kpiBtn-ALL"
-          onclick="filterByKpi('ALL')">All Staff</button>
-        <button class="btn btn-sm btn-outline-success py-0 px-2" id="kpiBtn-CLOCKED_IN_TODAY"
-          onclick="filterByKpi('CLOCKED_IN_TODAY')">Clocked In (<span id="btnClockedInCnt">0</span>)</button>
-        <button class="btn btn-sm btn-outline-warning py-0 px-2 text-dark" id="kpiBtn-NOT_CLOCKED_IN"
-          onclick="filterByKpi('NOT_CLOCKED_IN')">Pending (<span id="btnPendingCnt">0</span>)</button>
-        <button class="btn btn-sm btn-outline-danger py-0 px-2" id="kpiBtn-LEAVE_CLOSED"
-          onclick="filterByKpi('LEAVE_CLOSED')">On Leave (<span id="btnLeaveCnt">0</span>)</button>
+      <!-- Target Date / Range Navigation -->
+      <div class="col-lg-3 col-md-4">
+        <label class="form-label small fw-bold mb-1 d-flex justify-content-between align-items-center">
+          <span><i class="fa-regular fa-calendar-days me-1"></i>Target Date</span>
+          <span id="adminPeriodRangeBadge" class="badge bg-info-subtle text-info border small" style="font-size:0.7rem;">Today</span>
+        </label>
+        <div class="input-group input-group-sm">
+          <button class="btn btn-outline-secondary" onclick="navigateAdminDate(-1)" title="Previous Period">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <input type="date" id="adminFilterDate" class="form-control text-center fw-semibold" onchange="loadAdminDashboardData()">
+          <button class="btn btn-outline-secondary" onclick="navigateAdminDate(1)" title="Next Period">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+          <button class="btn btn-outline-primary" onclick="setAdminDateToday()" title="Current / Today">
+            Today
+          </button>
+        </div>
+      </div>
+
+      <!-- Shift Filter -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small fw-bold mb-1"><i class="fa-solid fa-clock me-1"></i>Shift</label>
+        <select id="adminFilterShift" class="form-select form-select-sm" onchange="loadAdminDashboardData()">
+          <option value="ALL">All Shifts</option>
+          <option value="General">General (8h)</option>
+          <option value="1st">1st Shift (7h)</option>
+          <option value="Afternoon">Afternoon Shift (7h)</option>
+          <option value="2nd">2nd Shift (7h)</option>
+        </select>
+      </div>
+
+      <!-- Client Filter -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small fw-bold mb-1"><i class="fa-solid fa-building me-1"></i>Client</label>
+        <select id="adminFilterClient" class="form-select form-select-sm" onchange="onAdminClientChange()">
+          <option value="ALL">All Clients</option>
+        </select>
+      </div>
+
+      <!-- Project Filter -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small fw-bold mb-1"><i class="fa-solid fa-folder me-1"></i>Project</label>
+        <select id="adminFilterProject" class="form-select form-select-sm" onchange="loadAdminDashboardData()">
+          <option value="ALL">All Projects</option>
+        </select>
+      </div>
+
+      <!-- Team Filter -->
+      <div class="col-lg-1 col-md-4">
+        <label class="form-label small fw-bold mb-1"><i class="fa-solid fa-users-gear me-1"></i>Team</label>
+        <select id="adminFilterTeam" class="form-select form-select-sm" onchange="loadAdminDashboardData()">
+          <option value="ALL">All</option>
+          <option value="Annotation">Annotation</option>
+          <option value="Quality">Quality</option>
+          <option value="Engineering">Engineering</option>
+          <option value="Operations">Operations</option>
+        </select>
       </div>
     </div>
 
-    <!-- EMPLOYEE LIVE ATTENDANCE & TASK ROSTER TABLE -->
-    <div class="card card-hurix p-4 mb-4">
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <h6 class="fw-bold text-primary mb-0">
-          <i class="fa-solid fa-users me-2"></i>Staff Live Shift & Task Monitoring Roster
+    <!-- Second Filter Row: Search & Period Notice -->
+    <div class="row g-2 align-items-center mt-2 pt-2 border-top">
+      <div class="col-md-5">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted small"></i></span>
+          <input type="text" id="adminSearchInput" class="form-control" placeholder="Search associate by name, ID or email..."
+            oninput="filterAdminStaffTable()" onkeydown="if(event.key==='Enter') loadAdminDashboardData()">
+        </div>
+      </div>
+      <div class="col-md-7 text-md-end text-muted small">
+        <i class="fa-solid fa-circle-info text-primary me-1"></i>
+        Viewing period: <strong id="adminPeriodDetailLabel" class="text-dark">Current Date</strong>
+        <span class="mx-2">•</span>
+        <span class="badge bg-light text-secondary border"><i class="fa-solid fa-mug-hot text-warning me-1"></i>Fixed 1h Daily Break Auto-Deducted</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONSOLIDATED COMPACT SINGLE-ROW KPI SCORECARDS (Strict single-row layout across all screens) -->
+  <div class="kpi-row-compact d-flex flex-row flex-nowrap align-items-stretch gap-2 mb-4 overflow-x-auto w-100"
+       style="display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch !important; gap: 8px !important; overflow-x: auto !important; width: 100% !important; margin-bottom: 1.25rem !important; padding-bottom: 4px !important;">
+    
+    <!-- Card 1: Total Staff Capacity -->
+    <div class="kpi-card-compact d-flex flex-column justify-content-between p-2 flex-grow-1"
+         style="flex: 1 1 0% !important; min-width: 110px !important; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-left: 3.5px solid #0082c8 !important; border-radius: 10px !important; padding: 7px 9px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;">
+      <div class="d-flex align-items-center justify-content-between">
+        <span class="kpi-label text-truncate" style="font-size: 0.68rem !important; font-weight: 700 !important; text-transform: uppercase !important; color: #64748b !important; letter-spacing: 0.3px !important; white-space: nowrap !important;">Total Staff</span>
+        <i class="fa-solid fa-users text-primary" style="font-size:0.75rem;"></i>
+      </div>
+      <div id="adminTotalStaffVal" class="kpi-value text-dark" style="font-size: 1.15rem !important; font-weight: 800 !important; line-height: 1.2 !important; margin: 3px 0 !important; white-space: nowrap !important;">0</div>
+      <div class="kpi-sub text-truncate" style="font-size: 0.64rem !important; color: #64748b !important; white-space: nowrap !important;"><i class="fa-solid fa-id-badge me-1"></i>Registered</div>
+    </div>
+
+    <!-- Card 2: Active / Clocked In -->
+    <div class="kpi-card-compact d-flex flex-column justify-content-between p-2 flex-grow-1"
+         style="flex: 1 1 0% !important; min-width: 110px !important; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-left: 3.5px solid #10b981 !important; border-radius: 10px !important; padding: 7px 9px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;">
+      <div class="d-flex align-items-center justify-content-between">
+        <span class="kpi-label text-truncate" style="font-size: 0.68rem !important; font-weight: 700 !important; text-transform: uppercase !important; color: #64748b !important; letter-spacing: 0.3px !important; white-space: nowrap !important;">Active / In</span>
+        <i class="fa-solid fa-user-check text-success" style="font-size:0.75rem;"></i>
+      </div>
+      <div id="adminClockedInSub" class="kpi-value text-success" style="font-size: 1.15rem !important; font-weight: 800 !important; line-height: 1.2 !important; margin: 3px 0 !important; white-space: nowrap !important;">0</div>
+      <div class="kpi-sub text-truncate" style="font-size: 0.64rem !important; color: #64748b !important; white-space: nowrap !important;"><i class="fa-solid fa-business-time me-1"></i>Active in Period</div>
+    </div>
+
+    <!-- Card 3: Staff On Leave & Leave Hours -->
+    <div class="kpi-card-compact d-flex flex-column justify-content-between p-2 flex-grow-1"
+         style="flex: 1 1 0% !important; min-width: 110px !important; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-left: 3.5px solid #ef4444 !important; border-radius: 10px !important; padding: 7px 9px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;">
+      <div class="d-flex align-items-center justify-content-between">
+        <span class="kpi-label text-truncate" style="font-size: 0.68rem !important; font-weight: 700 !important; text-transform: uppercase !important; color: #64748b !important; letter-spacing: 0.3px !important; white-space: nowrap !important;">Staff On Leave</span>
+        <i class="fa-solid fa-calendar-xmark text-danger" style="font-size:0.75rem;"></i>
+      </div>
+      <div class="d-flex align-items-baseline gap-1" style="margin: 3px 0 !important;">
+        <span id="adminOnLeaveCnt" class="kpi-value text-danger" style="font-size: 1.15rem !important; font-weight: 800 !important; line-height: 1.2 !important; white-space: nowrap !important;">0</span>
+        <small class="text-danger fw-bold" style="font-size:0.72rem !important; white-space: nowrap !important;">(<span id="adminTotalLeaveHoursVal">0.0</span>h)</small>
+      </div>
+      <div class="kpi-sub text-truncate" style="font-size: 0.64rem !important; color: #64748b !important; white-space: nowrap !important;" title="Leave hours kept separate from worked time"><i class="fa-solid fa-clock-rotate-left me-1"></i>Leave Time Total</div>
+    </div>
+
+    <!-- Card 4: Net Shift Working Hours (1h break deducted) -->
+    <div class="kpi-card-compact d-flex flex-column justify-content-between p-2 flex-grow-1"
+         style="flex: 1 1 0% !important; min-width: 110px !important; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-left: 3.5px solid #0284c7 !important; border-radius: 10px !important; padding: 7px 9px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;">
+      <div class="d-flex align-items-center justify-content-between">
+        <span class="kpi-label text-truncate" style="font-size: 0.68rem !important; font-weight: 700 !important; text-transform: uppercase !important; color: #64748b !important; letter-spacing: 0.3px !important; white-space: nowrap !important;">Net Shift Hrs</span>
+        <i class="fa-solid fa-clock text-info" style="font-size:0.75rem;"></i>
+      </div>
+      <div id="adminActualWorkedHours" class="kpi-value text-info" style="font-size: 1.15rem !important; font-weight: 800 !important; line-height: 1.2 !important; margin: 3px 0 !important; white-space: nowrap !important;">0.00h</div>
+      <div class="kpi-sub text-truncate" style="font-size: 0.64rem !important; color: #64748b !important; white-space: nowrap !important;"><i class="fa-solid fa-mug-hot me-1"></i>-1h Break / Day</div>
+    </div>
+
+    <!-- Card 5: Total Available Production Hours (Avg HC x Shift Hrs) -->
+    <div class="kpi-card-compact d-flex flex-column justify-content-between p-2 flex-grow-1"
+         style="flex: 1 1 0% !important; min-width: 110px !important; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-left: 3.5px solid #3b82f6 !important; border-radius: 10px !important; padding: 7px 9px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;">
+      <div class="d-flex align-items-center justify-content-between">
+        <span class="kpi-label text-truncate" style="font-size: 0.68rem !important; font-weight: 700 !important; text-transform: uppercase !important; color: #64748b !important; letter-spacing: 0.3px !important; white-space: nowrap !important;">Avail Prod Hrs</span>
+        <i class="fa-solid fa-calculator text-primary" style="font-size:0.75rem;"></i>
+      </div>
+      <div id="adminTotalAvailProdHours" class="kpi-value text-primary" style="font-size: 1.15rem !important; font-weight: 800 !important; line-height: 1.2 !important; margin: 3px 0 !important; white-space: nowrap !important;">0.00h</div>
+      <div class="kpi-sub text-truncate" style="font-size: 0.64rem !important; color: #64748b !important; white-space: nowrap !important;"><i class="fa-solid fa-people-group me-1"></i>Avg HC &times; Shift</div>
+    </div>
+
+    <!-- Card 6: Active Production Hours -->
+    <div class="kpi-card-compact d-flex flex-column justify-content-between p-2 flex-grow-1"
+         style="flex: 1 1 0% !important; min-width: 110px !important; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-left: 3.5px solid #059669 !important; border-radius: 10px !important; padding: 7px 9px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;">
+      <div class="d-flex align-items-center justify-content-between">
+        <span class="kpi-label text-truncate" style="font-size: 0.68rem !important; font-weight: 700 !important; text-transform: uppercase !important; color: #64748b !important; letter-spacing: 0.3px !important; white-space: nowrap !important;">Active Prod Hrs</span>
+        <i class="fa-solid fa-gear text-success" style="font-size:0.75rem;"></i>
+      </div>
+      <div id="adminProductionHours" class="kpi-value text-success" style="font-size: 1.15rem !important; font-weight: 800 !important; line-height: 1.2 !important; margin: 3px 0 !important; white-space: nowrap !important;">0.00h</div>
+      <div class="kpi-sub text-truncate" style="font-size: 0.64rem !important; color: #64748b !important; white-space: nowrap !important;"><i class="fa-solid fa-arrow-trend-up me-1"></i>Production Output</div>
+    </div>
+
+    <!-- Card 7: Production Utilization % -->
+    <div class="kpi-card-compact d-flex flex-column justify-content-between p-2 flex-grow-1"
+         style="flex: 1 1 0% !important; min-width: 110px !important; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-left: 3.5px solid #8b5cf6 !important; border-radius: 10px !important; padding: 7px 9px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;">
+      <div class="d-flex align-items-center justify-content-between">
+        <span class="kpi-label text-truncate" style="font-size: 0.68rem !important; font-weight: 700 !important; text-transform: uppercase !important; color: #64748b !important; letter-spacing: 0.3px !important; white-space: nowrap !important;">Prod Util %</span>
+        <i class="fa-solid fa-percent text-purple" style="font-size:0.75rem; color:#8b5cf6;"></i>
+      </div>
+      <div id="adminProdUtilPct" class="kpi-value" style="font-size: 1.15rem !important; font-weight: 800 !important; line-height: 1.2 !important; margin: 3px 0 !important; color: #8b5cf6 !important; white-space: nowrap !important;">0.00%</div>
+      <div class="kpi-sub text-truncate" style="font-size: 0.64rem !important; color: #64748b !important; white-space: nowrap !important;"><i class="fa-solid fa-chart-line me-1"></i>Prod / Available</div>
+    </div>
+
+    <!-- Card 8: Meeting & Downtime Time -->
+    <div class="kpi-card-compact d-flex flex-column justify-content-between p-2 flex-grow-1"
+         style="flex: 1 1 0% !important; min-width: 110px !important; background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-left: 3.5px solid #f59e0b !important; border-radius: 10px !important; padding: 7px 9px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;">
+      <div class="d-flex align-items-center justify-content-between">
+        <span class="kpi-label text-truncate" style="font-size: 0.68rem !important; font-weight: 700 !important; text-transform: uppercase !important; color: #64748b !important; letter-spacing: 0.3px !important; white-space: nowrap !important;">Non-Prod Time</span>
+        <i class="fa-solid fa-comments text-warning" style="font-size:0.75rem;"></i>
+      </div>
+      <div id="adminMeetingNonProdHours" class="kpi-value text-warning" style="font-size: 1.15rem !important; font-weight: 800 !important; line-height: 1.2 !important; margin: 3px 0 !important; white-space: nowrap !important;">0.00h</div>
+      <div class="kpi-sub text-truncate" style="font-size: 0.64rem !important; color: #64748b !important; white-space: nowrap !important;"><i class="fa-solid fa-pause me-1"></i>Meet/Train/Idle/Down</div>
+    </div>
+  </div>
+
+  <!-- EXECUTIVE PRODUCTIVITY & HEADCOUNT SUMMARY TABLE (Matching Spreadsheet Reference) -->
+  <div class="card card-hurix p-4 mb-4 shadow-sm">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div>
+        <h6 class="fw-bold text-primary mb-1">
+          <i class="fa-solid fa-table-cells me-2"></i>Executive Productivity & Headcount Summary
         </h6>
-        <span class="badge bg-light text-secondary border small">1h standard break auto-deducted on shift completion</span>
+        <span class="text-muted small">Standardized utilization metrics calculated from average headcount and shift benchmarks</span>
       </div>
-
-      <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
-        <table class="table table-hurix table-hover align-middle mb-0" style="font-size: 0.85rem;">
-          <thead class="table-light sticky-top">
-            <tr>
-              <th style="min-width: 140px;">Employee</th>
-              <th style="min-width: 100px;">Assigned Client/Project</th>
-              <th style="min-width: 90px;">Attendance</th>
-              <th style="min-width: 100px;">Shift Window</th>
-              <th>Shift Net Hrs</th>
-              <th>Task Logs</th>
-              <th>Task Logged Hrs</th>
-              <th>Earned Credit</th>
-              <th>Leakage Gap</th>
-              <th style="min-width: 120px; text-align: center;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="adminStaffTableBody">
-            <tr>
-              <td colspan="10" class="text-center text-muted py-4">
-                <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading live attendance & tasks...
-              </td>
-            </tr>
-          </tbody>
-          <tfoot id="adminStaffTableFoot" class="table-light fw-bold"></tfoot>
-        </table>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-secondary border small">
+          <i class="fa-solid fa-calculator text-primary me-1"></i>Available Prod Hrs = Avg Prod HC &times; Shift (General 8h / Others 7h) &times; Range
+        </span>
+        <button onclick="exportSummaryTableCsv()" class="btn btn-outline-primary btn-sm py-1 px-2.5" title="Export Executive Summary Table to CSV">
+          <i class="fa-solid fa-file-excel me-1"></i>Export Summary CSV
+        </button>
       </div>
     </div>
 
+    <div class="table-ref-summary-container">
+      <table class="table-ref-summary text-center">
+        <thead>
+          <tr>
+            <th style="min-width: 85px;">Month</th>
+            <th style="min-width: 140px;">Project Name</th>
+            <th style="min-width: 85px;">Prod Head Count</th>
+            <th style="min-width: 85px;">Support Head Count</th>
+            <th style="min-width: 110px;">Total Available Production Hrs</th>
+            <th style="min-width: 100px;">Active production Hours</th>
+            <th style="min-width: 100px;">Training (Client + Internal)</th>
+            <th style="min-width: 75px;">Idle</th>
+            <th style="min-width: 75px;">Down Time</th>
+            <th style="min-width: 100px;">Meeting (Client + Internal)</th>
+            <th style="min-width: 75px;">Leave</th>
+            <th style="min-width: 95px;">Production Utilization %</th>
+            <th style="min-width: 100px;">Non Productive Hours %</th>
+          </tr>
+        </thead>
+        <tbody id="adminRefSummaryTableBody">
+          <tr>
+            <td colspan="13" class="text-center py-4 text-muted">
+              <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading productivity summary...
+            </td>
+          </tr>
+        </tbody>
+        <tfoot id="adminRefSummaryTableFoot"></tfoot>
+      </table>
+    </div>
   </div>
 
+  <!-- USEFUL TOTALS & WORK LOG BREAKDOWNS SECTION -->
+  <div class="row g-4 mb-4">
+    <!-- LEFT: TIME BY ACTIVITY BREAKDOWN -->
+    <div class="col-lg-6">
+      <div class="card card-hurix p-4 h-100 shadow-sm">
+        <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+          <h6 class="fw-bold text-primary mb-0">
+            <i class="fa-solid fa-chart-bar me-2"></i>Time Breakdown by Activity
+          </h6>
+          <span class="badge bg-light text-muted border small">All 6 Work Categories</span>
+        </div>
 
+        <div id="activityBreakdownContainer" class="d-flex flex-column gap-3">
+          <!-- Will be rendered dynamically via renderAdminDashboard() -->
+          <div class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading activity breakdown...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: TIME BY CLIENT & PROJECT BREAKDOWN -->
+    <div class="col-lg-6">
+      <div class="card card-hurix p-4 h-100 shadow-sm">
+        <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+          <h6 class="fw-bold text-primary mb-0">
+            <i class="fa-solid fa-briefcase me-2"></i>Time Breakdown by Client & Project
+          </h6>
+          <ul class="nav nav-pills nav-pills-sm" id="breakdownPills" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active py-1 px-2.5 small fw-bold" id="pills-clients-tab" data-bs-toggle="pill" data-bs-target="#pills-clients" type="button" role="tab">Clients</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link py-1 px-2.5 small fw-bold" id="pills-projects-tab" data-bs-toggle="pill" data-bs-target="#pills-projects" type="button" role="tab">Projects</button>
+            </li>
+          </ul>
+        </div>
+
+        <div class="tab-content" id="breakdownTabContent">
+          <!-- Clients Tab -->
+          <div class="tab-pane fade show active" id="pills-clients" role="tabpanel">
+            <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+              <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>Client</th>
+                    <th class="text-end">Logged Hours</th>
+                    <th class="text-end" style="width: 100px;">Share</th>
+                  </tr>
+                </thead>
+                <tbody id="clientBreakdownTableBody">
+                  <tr><td colspan="3" class="text-center text-muted py-3">No client logs recorded in this period.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Projects Tab -->
+          <div class="tab-pane fade" id="pills-projects" role="tabpanel">
+            <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+              <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>Project</th>
+                    <th>Client</th>
+                    <th class="text-end">Logged Hours</th>
+                    <th class="text-end" style="width: 90px;">Share</th>
+                  </tr>
+                </thead>
+                <tbody id="projectBreakdownTableBody">
+                  <tr><td colspan="4" class="text-center text-muted py-3">No project logs recorded in this period.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONSOLIDATED ASSOCIATE WORK LOGS & ATTENDANCE ROSTER -->
+  <div class="card card-hurix p-4 mb-4 shadow-sm">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div>
+        <h6 class="fw-bold text-primary mb-1">
+          <i class="fa-solid fa-users me-2"></i>Associate Work Logs & Performance Roster
+        </h6>
+        <span class="text-muted small">Summary of shift attendance and logged activities for the selected period</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-secondary border small">1h daily break auto-deducted for each worked day</span>
+      </div>
+    </div>
+
+    <div class="table-responsive" style="max-height: 540px; overflow-y: auto;">
+      <table class="table table-hurix table-hover align-middle mb-0" style="font-size: 0.85rem;">
+        <thead class="table-light sticky-top">
+          <tr>
+            <th style="width: 35px;">#</th>
+            <th style="min-width: 140px;">Associate</th>
+            <th style="min-width: 110px;">Primary Assignment</th>
+            <th style="min-width: 95px;">Shift / Status</th>
+            <th class="text-end">Net Shift Hrs</th>
+            <th class="text-end text-danger">Leave Hrs</th>
+            <th class="text-end">Work Log Hrs</th>
+            <th style="min-width: 200px;">Activity Breakdown</th>
+            <th style="min-width: 155px; text-align: center;">Action / Schedule</th>
+          </tr>
+        </thead>
+        <tbody id="adminStaffTableBody">
+          <tr>
+            <td colspan="9" class="text-center text-muted py-4">
+              <i class="fa-solid fa-spinner fa-spin me-2"></i>Loading consolidated roster...
+            </td>
+          </tr>
+        </tbody>
+        <tfoot id="adminStaffTableFoot" class="table-light fw-bold"></tfoot>
+      </table>
+    </div>
+  </div>
 
 </div>
 
-<!-- TASK INSPECTION MODAL (SHARED) -->
-<div class="modal fade" id="empTaskInspectionModal" tabindex="-1" aria-hidden="true">
+<!-- EMPLOYEE WORK LOGS INSPECTION MODAL -->
+<div class="modal fade" id="empWorkLogsInspectionModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content modal-content-hurix p-3">
-      <div class="modal-header border-0">
-        <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-list-check me-2"></i>Logged Tasks Inspection</h5>
+      <div class="modal-header border-0 pb-1 d-flex justify-content-between align-items-start">
+        <div>
+          <h5 class="modal-title fw-bold text-primary mb-0">
+            <i class="fa-solid fa-list-check me-2"></i>Associate Work Logs Inspection
+          </h5>
+          <div class="d-flex align-items-center gap-2 mt-1">
+            <span id="inspectionEmpName" class="fw-bold fs-6 text-dark">Associate Name</span>
+            <small id="inspectionEmpIdTeam" class="text-muted fw-semibold"></small>
+          </div>
+          <div id="inspectionSummaryBadges" class="d-flex flex-wrap gap-2 mt-2"></div>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div id="inspectEmpName" class="fw-bold fs-6 mb-3 text-dark">Employee Name</div>
-        <div class="table-responsive">
+        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
           <table class="table table-bordered table-hover align-middle mb-0" style="font-size: 0.85rem;">
-            <thead class="table-light">
+            <thead class="table-light sticky-top">
               <tr>
-                <th>Client/Project</th>
+                <th style="width: 40px;" class="text-center">#</th>
+                <th style="min-width: 100px;">Date</th>
+                <th>Client &amp; Project</th>
                 <th>Activity</th>
-                <th>Units Done</th>
-                <th>Hours Worked</th>
-                <th>Earned Credit</th>
-                <th>Efficiency %</th>
-                <th>Status</th>
-                <th>Remarks</th>
+                <th class="text-end" style="width: 120px;">Hours Worked</th>
+                <th>Remarks / Notes</th>
               </tr>
             </thead>
-            <tbody id="empTaskInspectionModalBody"></tbody>
+            <tbody id="inspectionWorkLogsTableBody">
+              <tr>
+                <td colspan="6" class="text-center text-muted py-3">No work logs recorded for this period.</td>
+              </tr>
+            </tbody>
+            <tfoot id="inspectionWorkLogsTableFoot" class="table-light fw-bold"></tfoot>
           </table>
         </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
 </div>
 
-
-
-<!-- ADMIN MANUAL ATTENDANCE / LEAVE MODAL -->
+<!-- MANAGER MANUAL ATTENDANCE / LEAVE MODAL -->
 <div class="modal fade" id="adminManualAttendanceModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content modal-content-hurix p-3">
       <div class="modal-header border-0">
-        <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-user-pen me-2"></i>Mark Employee Attendance / Leave</h5>
+        <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-user-pen me-2"></i>Mark Associate Attendance / Leave</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form onsubmit="handleAdminManualAttendanceSubmit(event)">
         <div class="modal-body">
-          <input type="hidden" id="adminManualEmpId">
           <div class="mb-3">
-            <label class="form-label small fw-bold">Employee</label>
-            <input type="text" id="adminManualEmpName" class="form-control" readonly>
+            <label class="form-label small fw-bold">Associate</label>
+            <select id="adminManualEmpSelect" class="form-select" required>
+              <option value="">-- Select Associate --</option>
+            </select>
           </div>
           <div class="mb-3">
             <label class="form-label small fw-bold">Date</label>
             <input type="date" id="adminManualDate" class="form-control" required>
           </div>
           <div class="mb-3">
-            <label class="form-label small fw-bold">Attendance Category</label>
+            <label class="form-label small fw-bold">Attendance / Leave Category</label>
             <select id="adminManualCategory" class="form-select" onchange="onAdminManualCategoryChange()" required>
-              <option value="PL">PL - Planned Leave</option>
+              <option value="PL">PL - Planned Leave (Full Day)</option>
               <option value="UL">UL - Unplanned Leave</option>
               <option value="HL">HL - Half Day Leave (4 Hours)</option>
               <option value="Permission">Permission (Short Out-of-Office)</option>
-              <option value="Present">Present (Manual Override)</option>
+              <option value="WO">WO - Week Off</option>
+              <option value="Holiday">Holiday - Public / Company Holiday</option>
+              <option value="Present">Present (Manual Shift Override)</option>
             </select>
           </div>
           <div class="mb-3 d-none" id="adminManualPermGroup">
-            <label class="form-label small fw-bold">Permission / Leave Hours</label>
+            <label class="form-label small fw-bold">Permission Duration (Hours)</label>
             <input type="number" id="adminManualPermHrs" class="form-control" step="0.5" min="0.5" value="2.0">
           </div>
           <div class="mb-3">
             <label class="form-label small fw-bold">Manager Remarks</label>
-            <textarea id="adminManualRemarks" class="form-control" rows="2" placeholder="Reason for manual entry..." required></textarea>
+            <textarea id="adminManualRemarks" class="form-control" rows="2" placeholder="Reason for attendance/leave entry..." required></textarea>
           </div>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" id="adminManualSubmitBtn" class="btn btn-hurix px-4">Update Attendance</button>
+          <button type="submit" id="adminManualSubmitBtn" class="btn btn-hurix px-4">Record Attendance</button>
         </div>
       </form>
     </div>

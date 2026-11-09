@@ -95,6 +95,80 @@ function normalizeDateStr(raw, timeZone) {
 }
 
 /**
+ * EXACT WORK ACTIVITIES REQUIRED ACROSS SYSTEM (Includes Support)
+ */
+const ALLOWED_ACTIVITIES = [
+  'Production',
+  'Support',
+  'Client Meeting',
+  'Internal Meeting',
+  'Training (Material Go-Through)',
+  'Idle',
+  'Down Time'
+];
+
+/**
+ * Normalizes any activity string to one of the allowed activities
+ */
+function normalizeActivityType(raw) {
+  if (!raw) return 'Production';
+  var s = String(raw).trim();
+  for (var i = 0; i < ALLOWED_ACTIVITIES.length; i++) {
+    if (ALLOWED_ACTIVITIES[i].toLowerCase() === s.toLowerCase()) {
+      return ALLOWED_ACTIVITIES[i];
+    }
+  }
+  var lower = s.toLowerCase();
+  if (lower.indexOf('support') !== -1) return 'Support';
+  if (lower.indexOf('client meet') !== -1) return 'Client Meeting';
+  if (lower.indexOf('internal meet') !== -1 || lower.indexOf('meeting') !== -1) return 'Internal Meeting';
+  if (lower.indexOf('train') !== -1 || lower.indexOf('upskill') !== -1 || lower.indexOf('material') !== -1 || lower.indexOf('bench') !== -1) return 'Training (Material Go-Through)';
+  if (lower.indexOf('idle') !== -1 || lower.indexOf('waiting') !== -1 || lower.indexOf('allocation') !== -1) return 'Idle';
+  if (lower.indexOf('downtime') !== -1 || lower.indexOf('down time') !== -1) return 'Down Time';
+  return 'Production';
+}
+
+/**
+ * Calculates start and end dates and label for day, week, and month periods
+ */
+function getDateRangeForPeriod(targetDateStr, period, timeZone) {
+  timeZone = timeZone || Session.getScriptTimeZone();
+  var normalized = normalizeDateStr(targetDateStr, timeZone) || Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd');
+  var parts = normalized.split('-');
+  var y = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10) - 1;
+  var d = parseInt(parts[2], 10);
+  var dt = new Date(y, m, d);
+
+  if (period === 'week') {
+    var dayOfWeek = dt.getDay(); // 0 is Sunday, 1 is Monday
+    var diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+    var monday = new Date(y, m, d + diffToMonday);
+    var sunday = new Date(y, m, d + diffToMonday + 6);
+    return {
+      startDate: Utilities.formatDate(monday, timeZone, 'yyyy-MM-dd'),
+      endDate: Utilities.formatDate(sunday, timeZone, 'yyyy-MM-dd'),
+      label: 'Week: ' + Utilities.formatDate(monday, timeZone, 'dd MMM') + ' - ' + Utilities.formatDate(sunday, timeZone, 'dd MMM yyyy')
+    };
+  } else if (period === 'month') {
+    var firstDay = new Date(y, m, 1);
+    var lastDay = new Date(y, m + 1, 0);
+    return {
+      startDate: Utilities.formatDate(firstDay, timeZone, 'yyyy-MM-dd'),
+      endDate: Utilities.formatDate(lastDay, timeZone, 'yyyy-MM-dd'),
+      label: Utilities.formatDate(firstDay, timeZone, 'MMMM yyyy')
+    };
+  } else {
+    // 'day'
+    return {
+      startDate: normalized,
+      endDate: normalized,
+      label: Utilities.formatDate(dt, timeZone, 'EEE, dd MMM yyyy')
+    };
+  }
+}
+
+/**
  * Returns the active Spreadsheet object
  */
 function getSpreadsheet() {
@@ -315,6 +389,51 @@ function getClientMasterData() {
 }
 
 /**
+ * SHIFT DEFINITIONS & PRODUCTION HOUR RULES
+ * General: 8 hours
+ * 1st, Afternoon, 2nd: 7 hours
+ */
+var SHIFT_TYPES = {
+  GENERAL: 'General',
+  SHIFT_1ST: '1st',
+  AFTERNOON: 'Afternoon',
+  SHIFT_2ND: '2nd'
+};
+
+var ALLOWED_SHIFTS = ['General', '1st', 'Afternoon', '2nd'];
+
+function normalizeShiftType(shift) {
+  if (!shift) return 'General';
+  var s = String(shift).trim().toLowerCase();
+  if (s === '1st' || s === '1' || s.indexOf('1st') !== -1) return '1st';
+  if (s === 'afternoon' || s.indexOf('afternoon') !== -1) return 'Afternoon';
+  if (s === '2nd' || s === '2' || s.indexOf('2nd') !== -1) return '2nd';
+  return 'General';
+}
+
+function getShiftStandardHours(shiftType) {
+  var s = normalizeShiftType(shiftType);
+  if (s === '1st' || s === 'Afternoon' || s === '2nd') return 7.0;
+  return 8.0; // General is 8 hours
+}
+
+function ensureAttendanceHeaders(sheet) {
+  if (!sheet) return [];
+  var headers = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  var needed = ['shift_type', 'leave_hours'];
+  var added = false;
+  needed.forEach(function(col) {
+    if (headers.indexOf(col) === -1) {
+      sheet.getRange(1, headers.length + 1).setValue(col);
+      headers.push(col);
+      added = true;
+    }
+  });
+  if (added) SpreadsheetApp.flush();
+  return headers;
+}
+
+/**
  * HELPER: Fetch Today's Shift State for Employee
  */
 function getActiveUserShiftState(empId) {
@@ -326,6 +445,7 @@ function getActiveUserShiftState(empId) {
   var attSheet = ss.getSheetByName(SHEET_NAMES.ATTENDANCE);
   if (!attSheet) return null;
 
+  ensureAttendanceHeaders(attSheet);
   var aData = attSheet.getDataRange().getValues();
   if (aData.length <= 1) return null;
 
@@ -368,35 +488,10 @@ function getActiveUserShiftState(empId) {
         }
       });
 
-      // Calculate total break minutes and active break start time exclusively from Break_Logs
-      if (shiftObj.log_id) {
-        var totalBreakMins = calculateAndSyncBreakDurations(ss, shiftObj.log_id);
-        shiftObj.total_break_minutes = totalBreakMins;
-
-        // If the user is currently ON_BREAK, retrieve the break_start_time
-        if (String(shiftObj.shift_status).toUpperCase() === 'ON_BREAK') {
-          var breakSheet = ss.getSheetByName(SHEET_NAMES.BREAK_LOGS);
-          if (breakSheet) {
-            var bData = breakSheet.getDataRange().getValues();
-            var bHeaders = bData[0];
-            var bLogIdx = bHeaders.indexOf('log_id');
-            var bStartIdx = bHeaders.indexOf('break_start_time');
-            var bStatusIdx = bHeaders.indexOf('break_status');
-            for (var b = 1; b < bData.length; b++) {
-              if (bLogIdx !== -1 && String(bData[b][bLogIdx]).trim() === String(shiftObj.log_id).trim()) {
-                var status = bStatusIdx !== -1 ? String(bData[b][bStatusIdx]).toUpperCase() : '';
-                if (status === 'ACTIVE') {
-                  var startVal = bStartIdx !== -1 ? bData[b][bStartIdx] : null;
-                  if (startVal) {
-                    shiftObj.break_start_time = startVal instanceof Date ? Utilities.formatDate(startVal, timeZone, 'HH:mm:ss') : String(startVal);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
+      // Fixed 1-hour daily break applied automatically for every user
+      shiftObj.total_break_minutes = 60;
+      shiftObj.shift_type = normalizeShiftType(shiftObj.shift_type || 'General');
+      shiftObj.leave_hours = Number(shiftObj.leave_hours) || 0;
       return shiftObj;
     }
   }
@@ -464,11 +559,8 @@ function getUserTodayTasks(empId, logId) {
         }
       }
 
-      // Ensure fallback properties for standard calculation fields if headers had older format
-      if (task.activity_type === undefined && data[i][18] !== undefined) task.activity_type = data[i][18];
-      if (task.idle_hours === undefined && data[i][19] !== undefined) task.idle_hours = data[i][19];
-      if (task.bench_hours === undefined && data[i][20] !== undefined) task.bench_hours = data[i][20];
-      if (task.blocked_hours === undefined && data[i][21] !== undefined) task.blocked_hours = data[i][21];
+      task.activity_type = normalizeActivityType(task.activity_type || data[i][18]);
+      task.actual_worked_hours = Number(task.actual_worked_hours) || 0;
 
       tasks.push(task);
     }
@@ -501,6 +593,7 @@ function clockInUser(payload) {
 
     autoClosePreviousOpenShiftsForUser(user.emp_id);
 
+    ensureAttendanceHeaders(sheet);
     var timeZone = Session.getScriptTimeZone();
     var todayStr = Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd');
     var data = sheet.getDataRange().getValues();
@@ -511,7 +604,9 @@ function clockInUser(payload) {
     var statusIdx = headers.indexOf('shift_status');
     var startIdx = headers.indexOf('shift_start_time');
     var endIdx = headers.indexOf('shift_end_time');
+    var shiftTypeIdx = headers.indexOf('shift_type');
 
+    var shiftType = normalizeShiftType(payload.shift_type || payload.shift || user.default_shift || 'General');
     var userEmpIdLower = String(user.emp_id || '').trim().toLowerCase();
 
     for (var i = 1; i < data.length; i++) {
@@ -542,27 +637,35 @@ function clockInUser(payload) {
             attStatus = 'Present';
           }
 
+          if (shiftTypeIdx !== -1 && (payload.shift_type || payload.shift)) {
+            rowValues[shiftTypeIdx] = shiftType;
+          }
+
           sheet.getRange(rowIndex, 1, 1, rowValues.length).setValues([rowValues]);
           SpreadsheetApp.flush();
           syncExternalDailySummaryRecords(todayStr, user.emp_id);
 
+          var activeShiftName = (shiftTypeIdx !== -1 && rowValues[shiftTypeIdx]) ? rowValues[shiftTypeIdx] : shiftType;
           return {
             success: true,
             log_id: data[i][headers.indexOf('log_id')],
             shift_start_time: startTimeVal,
             shift_status: 'OPEN',
+            shift_type: activeShiftName,
             permission_hours: existingPermHrs,
             attendance_status: attStatus,
             total_break_minutes: 60
           };
         }
 
+        var currentShiftName = (shiftTypeIdx !== -1 && data[i][shiftTypeIdx]) ? data[i][shiftTypeIdx] : shiftType;
         return {
           success: true,
           already_open: true,
           log_id: data[i][headers.indexOf('log_id')],
           shift_start_time: data[i][startIdx] instanceof Date ? Utilities.formatDate(data[i][startIdx], timeZone, 'HH:mm:ss') : String(data[i][startIdx]),
           shift_status: statusVal,
+          shift_type: currentShiftName,
           total_break_minutes: 60
         };
       }
@@ -593,11 +696,83 @@ function clockInUser(payload) {
     if (headers.indexOf('total_break_minutes') !== -1) newRow[headers.indexOf('total_break_minutes')] = 60;
     if (headers.indexOf('active_client') !== -1) newRow[headers.indexOf('active_client')] = user.default_client || 'iMerit';
     if (headers.indexOf('active_project') !== -1) newRow[headers.indexOf('active_project')] = user.default_project || 'Pravah';
+    if (headers.indexOf('shift_type') !== -1) newRow[headers.indexOf('shift_type')] = shiftType;
+    if (headers.indexOf('leave_hours') !== -1) newRow[headers.indexOf('leave_hours')] = 0;
 
     sheet.appendRow(newRow);
     SpreadsheetApp.flush();
     syncExternalDailySummaryRecords(todayStr, user.emp_id);
-    return { success: true, log_id: logId, shift_start_time: timeStr, shift_status: 'OPEN', total_break_minutes: 60 };
+    return { success: true, log_id: logId, shift_start_time: timeStr, shift_status: 'OPEN', shift_type: shiftType, total_break_minutes: 60 };
+  } catch (err) {
+    return { success: false, message: err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * SAVE / UPDATE USER'S SHIFT SELECTION FOR TODAY (General, 1st, Afternoon, 2nd)
+ */
+function saveUserTodayShift(payload) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) {
+    return { success: false, message: 'Server busy. Please try again.' };
+  }
+
+  try {
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAMES.ATTENDANCE);
+    if (!sheet) return { success: false, message: 'Attendance sheet not found.' };
+
+    var user = getUserByEmpId(payload.emp_id) || getUserByEmail(payload.email || Session.getActiveUser().getEmail());
+    if (!user) return { success: false, message: 'User not found in User_Master.' };
+
+    var timeZone = Session.getScriptTimeZone();
+    var todayStr = Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd');
+    var shiftType = normalizeShiftType(payload.shift_type || payload.shift || 'General');
+
+    ensureAttendanceHeaders(sheet);
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var empIdx = headers.indexOf('emp_id');
+    var dateIdx = headers.indexOf('date');
+    var shiftTypeIdx = headers.indexOf('shift_type');
+
+    var userEmpLower = String(user.emp_id || '').trim().toLowerCase();
+    var found = false;
+
+    for (var i = 1; i < data.length; i++) {
+      var rDate = normalizeDateStr(data[i][dateIdx], timeZone);
+      var rEmp = empIdx !== -1 ? String(data[i][empIdx]).trim().toLowerCase() : '';
+      if (rEmp === userEmpLower && rDate === todayStr) {
+        if (shiftTypeIdx !== -1) {
+          sheet.getRange(i + 1, shiftTypeIdx + 1).setValue(shiftType);
+        }
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      var now = new Date();
+      var cleanEmpId = String(user.emp_id || '').trim().replace(/[^a-zA-Z0-9]/g, '');
+      var logId = 'ATT-' + todayStr.replace(/-/g, '') + (cleanEmpId ? '-' + cleanEmpId : '') + '-' + Math.floor(100000 + Math.random() * 900000);
+      var newRow = new Array(headers.length);
+      for (var h = 0; h < headers.length; h++) newRow[h] = '';
+      if (headers.indexOf('log_id') !== -1) newRow[headers.indexOf('log_id')] = logId;
+      if (headers.indexOf('date') !== -1) newRow[headers.indexOf('date')] = todayStr;
+      if (headers.indexOf('emp_id') !== -1) newRow[headers.indexOf('emp_id')] = user.emp_id;
+      if (headers.indexOf('emp_name') !== -1) newRow[headers.indexOf('emp_name')] = user.emp_name;
+      if (headers.indexOf('attendance_status') !== -1) newRow[headers.indexOf('attendance_status')] = 'NOT_CLOCKED_IN';
+      if (headers.indexOf('shift_status') !== -1) newRow[headers.indexOf('shift_status')] = 'NOT_CLOCKED_IN';
+      if (headers.indexOf('total_break_minutes') !== -1) newRow[headers.indexOf('total_break_minutes')] = 60;
+      if (shiftTypeIdx !== -1) newRow[shiftTypeIdx] = shiftType;
+      if (headers.indexOf('created_at') !== -1) newRow[headers.indexOf('created_at')] = now;
+      sheet.appendRow(newRow);
+    }
+
+    SpreadsheetApp.flush();
+    return { success: true, shift_type: shiftType };
   } catch (err) {
     return { success: false, message: err.toString() };
   } finally {
@@ -645,332 +820,31 @@ function parseTimeStringToDate(timeVal, dateStr, timeZone) {
 }
 
 /**
- * PAUSE / RESUME SHIFT & GRANULAR BREAK_LOGS RECORDING
+ * PAUSE / RESUME SHIFT (DEPRECATED - Fixed 1-hour break is automatically accounted for)
  */
 function toggleShiftPause(payload) {
-  var lock = LockService.getScriptLock();
-  try { lock.waitLock(10000); } catch (e) {
-    return { success: false, message: 'Server busy.' };
-  }
-
-  try {
-    var ss = getSpreadsheet();
-    var sheet = ss.getSheetByName(SHEET_NAMES.ATTENDANCE);
-    var breakSheet = ss.getSheetByName(SHEET_NAMES.BREAK_LOGS) || ss.insertSheet(SHEET_NAMES.BREAK_LOGS);
-
-    var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-
-    var logIdIdx = headers.indexOf('log_id');
-    var statusIdx = headers.indexOf('shift_status');
-    var totalBreakIdx = headers.indexOf('total_break_minutes');
-    var breakStartIdx = headers.indexOf('break_start_time');
-    var empIdIdx = headers.indexOf('emp_id');
-    var empNameIdx = headers.indexOf('emp_name');
-    var dateIdx = headers.indexOf('date');
-
-    var rowIndex = -1;
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][logIdIdx]).trim() === String(payload.log_id).trim()) {
-        rowIndex = i + 1;
-        break;
-      }
-    }
-
-    if (rowIndex === -1) return { success: false, message: 'Active shift log not found.' };
-
-    var now = new Date();
-    var timeZone = Session.getScriptTimeZone();
-    var timeStr = Utilities.formatDate(now, timeZone, 'HH:mm:ss');
-    var todayStr = Utilities.formatDate(now, timeZone, 'yyyy-MM-dd');
-
-    var empIdVal = data[rowIndex - 1][empIdIdx];
-    var empNameVal = data[rowIndex - 1][empNameIdx];
-
-    if (payload.action === 'PAUSE') {
-      // Check if there is already an ACTIVE break for this log_id to prevent double logging
-      var bData = breakSheet.getDataRange().getValues();
-      if (bData.length > 1) {
-        var bHeaders = bData[0];
-        var bLogIdx = bHeaders.indexOf('log_id');
-        var bStartIdx = bHeaders.indexOf('break_start_time');
-        var bStatusIdx = bHeaders.indexOf('break_status');
-        var bIdIdx = bHeaders.indexOf('break_id');
-
-        for (var b = 1; b < bData.length; b++) {
-          var matchLog = bLogIdx !== -1 && String(bData[b][bLogIdx]).trim() === String(payload.log_id).trim();
-          var matchStatus = bStatusIdx !== -1 && String(bData[b][bStatusIdx]).toUpperCase() === 'ACTIVE';
-
-          if (matchLog && matchStatus) {
-            var existingStart = bStartIdx !== -1 ? bData[b][bStartIdx] : '';
-            var existingStartStr = existingStart ? (existingStart instanceof Date ? Utilities.formatDate(existingStart, timeZone, 'HH:mm:ss') : String(existingStart)) : timeStr;
-            var existingBreakId = bIdIdx !== -1 ? String(bData[b][bIdIdx]) : '';
-            
-            // Ensure status in Attendance sheet is ON_BREAK
-            sheet.getRange(rowIndex, statusIdx + 1).setValue('ON_BREAK');
-            SpreadsheetApp.flush();
-            syncExternalDailySummaryRecords(todayStr, empIdVal);
-            
-            return { success: true, shift_status: 'ON_BREAK', break_start_time: existingStartStr, break_id: existingBreakId };
-          }
-        }
-      }
-
-      // 1. Update Attendance_Shift_Logs status to ON_BREAK
-      sheet.getRange(rowIndex, statusIdx + 1).setValue('ON_BREAK');
-
-      // 2. Append Active Row to Break_Logs matching user sheet headers
-      var cleanEmpIdBrk = String(empIdVal || '').trim().replace(/[^a-zA-Z0-9]/g, '');
-      var breakId = 'BRK-' + todayStr.replace(/-/g, '') + (cleanEmpIdBrk ? '-' + cleanEmpIdBrk : '') + '-' + Math.floor(100000 + Math.random() * 900000);
-      var breakRow = [breakId, payload.log_id, empIdVal, empNameVal, todayStr, timeStr, '', 0, 'ACTIVE', new Date()];
-      breakSheet.appendRow(breakRow);
-      SpreadsheetApp.flush();
-      syncExternalDailySummaryRecords(todayStr, empIdVal);
-
-      return { success: true, shift_status: 'ON_BREAK', break_start_time: timeStr, break_id: breakId };
-    } else {
-      // RESUME ACTION
-      var addedMins = 0;
-
-      // 1. Locate and close ACTIVE break row in Break_Logs
-      var bData = breakSheet.getDataRange().getValues();
-      var bHeaders = bData[0];
-
-      var bLogIdx = bHeaders.indexOf('log_id');
-      var bStartIdx = bHeaders.indexOf('break_start_time');
-      var bEndIdx = bHeaders.indexOf('break_end_time');
-      
-      // Support both singular and plural duration header variants
-      var bDurIdx = bHeaders.indexOf('duration_minutes');
-      if (bDurIdx === -1) {
-        bDurIdx = bHeaders.indexOf('duration_minute');
-      }
-      
-      var bStatusIdx = bHeaders.indexOf('break_status');
-      var bCreatedAtIdx = bHeaders.indexOf('created_at');
-
-      for (var b = bData.length - 1; b >= 1; b--) {
-        var matchLog = bLogIdx !== -1 && String(bData[b][bLogIdx]).trim() === String(payload.log_id).trim();
-        var matchStatus = bStatusIdx !== -1 && String(bData[b][bStatusIdx]).toUpperCase() === 'ACTIVE';
-
-        if (matchLog && matchStatus) {
-          var bStartVal = bStartIdx !== -1 ? bData[b][bStartIdx] : null;
-          var bCreatedAtVal = bCreatedAtIdx !== -1 ? bData[b][bCreatedAtIdx] : null;
-
-          var startTime = null;
-          if (bCreatedAtVal instanceof Date && !isNaN(bCreatedAtVal.getTime())) {
-            startTime = bCreatedAtVal;
-          } else if (bStartVal) {
-            startTime = parseTimeStringToDate(bStartVal, todayStr, timeZone);
-          }
-
-          if (startTime && !isNaN(startTime.getTime())) {
-            var diffMs = now.getTime() - startTime.getTime();
-            addedMins = Math.max(0.01, Math.round((diffMs / (1000 * 60)) * 100) / 100);
-          }
-
-          var bRowIndex = b + 1;
-          if (bEndIdx !== -1) breakSheet.getRange(bRowIndex, bEndIdx + 1).setValue(timeStr);
-          if (bDurIdx !== -1) breakSheet.getRange(bRowIndex, bDurIdx + 1).setValue(addedMins);
-          if (bStatusIdx !== -1) breakSheet.getRange(bRowIndex, bStatusIdx + 1).setValue('COMPLETED');
-          break;
-        }
-      }
-
-      // 2. Sum all completed break durations for this log_id from Break_Logs
-      var totalBreakMins = calculateAndSyncBreakDurations(ss, payload.log_id);
-
-      sheet.getRange(rowIndex, statusIdx + 1).setValue('OPEN');
-      if (totalBreakIdx !== -1) sheet.getRange(rowIndex, totalBreakIdx + 1).setValue(totalBreakMins);
-      SpreadsheetApp.flush();
-      syncExternalDailySummaryRecords(todayStr, empIdVal);
-
-      return { success: true, shift_status: 'OPEN', total_break_minutes: totalBreakMins };
-    }
-  } catch (err) {
-    return { success: false, message: err.toString() };
-  } finally {
-    lock.releaseLock();
-  }
+  return {
+    success: true,
+    shift_status: 'OPEN',
+    total_break_minutes: 60,
+    message: 'Break-time logging is removed. A fixed 1-hour break per day is automatically accounted for.'
+  };
 }
 
 /**
  * HELPER: Calculate and Sync Break Durations
- * Handles both duration_minutes and duration_minute column variants.
- * Calculates elapsed break minutes and syncs them to Attendance and Break_Logs.
+ * Fixed 1-hour (60 minutes) daily break applied automatically.
  */
 function calculateAndSyncBreakDurations(ss, logId) {
-  var breakSheet = ss.getSheetByName(SHEET_NAMES.BREAK_LOGS);
-  if (!breakSheet) return 0;
-  
-  var bData = breakSheet.getDataRange().getValues();
-  if (bData.length <= 1) return 0;
-  
-  var bHeaders = bData[0];
-  var bLogIdx = bHeaders.indexOf('log_id');
-  var bStartIdx = bHeaders.indexOf('break_start_time');
-  var bEndIdx = bHeaders.indexOf('break_end_time');
-  
-  // Support both singular and plural duration header variants
-  var bDurIdx = bHeaders.indexOf('duration_minutes');
-  if (bDurIdx === -1) {
-    bDurIdx = bHeaders.indexOf('duration_minute');
-  }
-  
-  var bStatusIdx = bHeaders.indexOf('break_status');
-  var bDateIdx = bHeaders.indexOf('date');
-  
-  var timeZone = Session.getScriptTimeZone();
-  var todayStr = Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd');
-  
-  var totalBreakMins = 0;
-  var sheetUpdated = false;
-  
-  for (var b = 1; b < bData.length; b++) {
-    if (bLogIdx !== -1 && String(bData[b][bLogIdx]).trim() === String(logId).trim()) {
-      var status = bStatusIdx !== -1 ? String(bData[b][bStatusIdx]).toUpperCase() : '';
-      var startVal = bStartIdx !== -1 ? bData[b][bStartIdx] : null;
-      var endVal = bEndIdx !== -1 ? bData[b][bEndIdx] : null;
-      
-      var startTime = null;
-      var endTime = null;
-      var bDateVal = bDateIdx !== -1 ? bData[b][bDateIdx] : null;
-      var bDateStr = normalizeDateStr(bDateVal, timeZone) || todayStr;
-      
-      if (startVal) startTime = parseTimeStringToDate(startVal, bDateStr, timeZone);
-      if (endVal) endTime = parseTimeStringToDate(endVal, bDateStr, timeZone);
-      
-      if (status === 'COMPLETED' || status === 'CLOSED' || (startTime && endTime)) {
-        var duration = bDurIdx !== -1 ? (Number(bData[b][bDurIdx]) || 0) : 0;
-        if (duration <= 0 && startTime && endTime && !isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
-          var diffMs = endTime.getTime() - startTime.getTime();
-          if (diffMs > 0) {
-            duration = Math.round((diffMs / (1000 * 60)) * 100) / 100;
-            
-            // Sync/Write back duration to Break_Logs sheet
-            var bRowIndex = b + 1;
-            if (bDurIdx !== -1) {
-              breakSheet.getRange(bRowIndex, bDurIdx + 1).setValue(duration);
-              sheetUpdated = true;
-            }
-            if (bStatusIdx !== -1 && (!status || status === 'ACTIVE' || status === '')) {
-              breakSheet.getRange(bRowIndex, bStatusIdx + 1).setValue('COMPLETED');
-              sheetUpdated = true;
-            }
-          }
-        }
-        totalBreakMins += duration;
-      }
-    }
-  }
-  
-  if (sheetUpdated) {
-    SpreadsheetApp.flush();
-  }
-  
-  // Sync the accumulated value to Attendance sheet
-  var attSheet = ss.getSheetByName(SHEET_NAMES.ATTENDANCE);
-  if (attSheet) {
-    var aData = attSheet.getDataRange().getValues();
-    var aHeaders = aData[0];
-    var logIdIdx = aHeaders.indexOf('log_id');
-    var totalBreakIdx = aHeaders.indexOf('total_break_minutes');
-    var shiftStartIdx = aHeaders.indexOf('shift_start_time');
-    var shiftEndIdx = aHeaders.indexOf('shift_end_time');
-    var totalShiftHoursIdx = aHeaders.indexOf('total_shift_hours');
-    var dateIdx = aHeaders.indexOf('date');
-
-    if (logIdIdx !== -1) {
-      for (var r = 1; r < aData.length; r++) {
-        if (String(aData[r][logIdIdx]).trim() === String(logId).trim()) {
-          var aRowIndex = r + 1;
-          if (totalBreakIdx !== -1) {
-            attSheet.getRange(aRowIndex, totalBreakIdx + 1).setValue(totalBreakMins);
-          }
-
-          // Recalculate shift hours if shift is already closed/ended
-          if (shiftStartIdx !== -1 && shiftEndIdx !== -1 && totalShiftHoursIdx !== -1) {
-            var startStr = aData[r][shiftStartIdx];
-            var endStr = aData[r][shiftEndIdx];
-            var shiftDateVal = aData[r][dateIdx];
-            var shiftDateStr = normalizeDateStr(shiftDateVal, timeZone) || todayStr;
-
-            if (startStr && endStr && String(endStr).trim() !== '--:--' && String(endStr).trim() !== '') {
-              var startTime = parseTimeStringToDate(startStr, shiftDateStr, timeZone);
-              var endTime = parseTimeStringToDate(endStr, shiftDateStr, timeZone);
-              if (startTime && endTime && !isNaN(startTime.getTime()) && !isNaN(endTime.getTime())) {
-                var grossMs = endTime.getTime() - startTime.getTime();
-                var breakMs = totalBreakMins * 60 * 1000;
-                var netWorkedHours = Math.max(0, (grossMs - breakMs) / (1000 * 60 * 60));
-                attSheet.getRange(aRowIndex, totalShiftHoursIdx + 1).setValue(Number(netWorkedHours.toFixed(2)));
-              }
-            }
-          }
-          break;
-        }
-      }
-    }
-  }
-  
-  return Math.round(totalBreakMins * 100) / 100;
+  return 60;
 }
 
 /**
  * HELPER: Fetch Itemized Break Logs for Employee / Log ID
+ * Deprecated: itemized break logs are removed.
  */
 function getEmpBreakLogs(logId, empId, targetDate) {
-  var ss = getSpreadsheet();
-  var breakSheet = ss.getSheetByName(SHEET_NAMES.BREAK_LOGS);
-  var breakList = [];
-  if (!breakSheet) return breakList;
-
-  var bData = breakSheet.getDataRange().getValues();
-  if (bData.length <= 1) return breakList;
-
-  var timeZone = Session.getScriptTimeZone();
-  var headers = bData[0];
-  var logIdx = headers.indexOf('log_id');
-  var empIdx = headers.indexOf('emp_id');
-  var dateIdx = headers.indexOf('date');
-  var createdAtIdx = headers.indexOf('created_at');
-
-  var targetDateStr = targetDate ? normalizeDateStr(targetDate, timeZone) : '';
-
-  for (var i = 1; i < bData.length; i++) {
-    var rowLogId = logIdx !== -1 ? String(bData[i][logIdx]).trim() : '';
-    var rowEmpId = empIdx !== -1 ? String(bData[i][empIdx]).trim().toLowerCase() : '';
-    var rowDateStr = normalizeDateStr(bData[i][dateIdx], timeZone);
-    if (!rowDateStr && createdAtIdx !== -1) {
-      rowDateStr = normalizeDateStr(bData[i][createdAtIdx], timeZone);
-    }
-
-    var targetEmpLower = empId ? String(empId).trim().toLowerCase() : '';
-    var matchLog = logId && rowLogId && rowLogId === String(logId).trim();
-    var matchEmp = targetEmpLower && rowEmpId && rowEmpId === targetEmpLower;
-    var matchDate = !targetDateStr || (rowDateStr && rowDateStr === targetDateStr);
-
-    if ((matchLog || matchEmp) && matchDate) {
-      var bObj = {};
-      headers.forEach(function(h, idx) {
-        var val = bData[i][idx];
-        var key = h;
-        // Normalize singular key to plural for frontend compatibility
-        if (key === 'duration_minute') key = 'duration_minutes';
-        
-        if (val instanceof Date) {
-          if (key === 'date' || key === 'created_at') {
-            bObj[key] = Utilities.formatDate(val, timeZone, 'yyyy-MM-dd HH:mm:ss');
-          } else {
-            bObj[key] = Utilities.formatDate(val, timeZone, 'HH:mm:ss');
-          }
-        } else {
-          bObj[key] = val !== null && val !== undefined ? String(val) : '';
-        }
-      });
-      breakList.push(bObj);
-    }
-  }
-  return breakList;
+  return [];
 }
 
 /**
@@ -999,12 +873,6 @@ function clockOutUser(payload) {
 
     if (rowIndex === -1) return { success: false, message: 'Active shift log not found.' };
 
-    var currentStatusIdx = headers.indexOf('shift_status');
-    var currentStatus = currentStatusIdx !== -1 ? String(data[rowIndex - 1][currentStatusIdx]).toUpperCase() : '';
-    if (currentStatus === 'ON_BREAK') {
-      toggleShiftPause({ log_id: payload.log_id, action: 'RESUME' });
-      data = sheet.getDataRange().getValues();
-    }
 
     var now = new Date();
     var timeZone = Session.getScriptTimeZone();
@@ -1093,15 +961,23 @@ function applyLeaveOrPermission(payload) {
     var empIdx = headers.indexOf('emp_id');
     var dateIdx = headers.indexOf('date');
 
-    var leaveCode = payload.leave_type || 'PL';
-    var isFullDayLeave = (leaveCode === 'PL' || leaveCode === 'UL' || leaveCode === 'ABSENT');
-    var isShortPerm = (leaveCode === 'PERM' || leaveCode === 'PERMISSION' || leaveCode === 'OD');
+    var rawLeaveCode = String(payload.leave_type || payload.category || 'PL').trim().toUpperCase();
+    var leaveCode = rawLeaveCode;
+    if (leaveCode === 'WEEK OFF' || leaveCode === 'WEEKOFF') leaveCode = 'WO';
+    if (leaveCode === 'HOLIDAY') leaveCode = 'HOLIDAY';
+    var isPresentOverride = (leaveCode === 'PRESENT');
+    var isScheduleOff = !isPresentOverride && (leaveCode === 'WO' || leaveCode === 'HOLIDAY');
+    var isFullDayLeave = !isScheduleOff && !isPresentOverride && (leaveCode === 'PL' || leaveCode === 'UL' || leaveCode === 'ABSENT');
+    var isShortPerm = !isScheduleOff && !isPresentOverride && (leaveCode === 'PERM' || leaveCode === 'PERMISSION' || leaveCode === 'OD');
     var permHrs = isShortPerm ? (Number(payload.permission_hours) || 2.0) : 0.0;
-    var shrinkageHrs = isFullDayLeave ? 8.0 : (leaveCode === 'HL' ? 4.0 : permHrs);
+    var shiftType = normalizeShiftType(payload.shift_type || payload.shift || user.default_shift || 'General');
+    var stdShiftHours = getShiftStandardHours(shiftType);
+    var leaveHours = (isScheduleOff || isPresentOverride) ? 0 : (isFullDayLeave ? stdShiftHours : (leaveCode === 'HL' ? (stdShiftHours / 2.0) : permHrs));
+    var shrinkageHrs = leaveHours;
     var proofUrl = payload.proof_url || '';
     var clientName = payload.active_client || user.default_client || 'iMerit';
     var projName = payload.active_project || user.default_project || 'Pravah';
-    var remarks = payload.remarks || '';
+    var remarks = payload.remarks || (isPresentOverride ? 'Manager manual shift override: Present' : (isScheduleOff ? (leaveCode === 'WO' ? 'Week Off' : 'Holiday') : ''));
 
     var userEmpLower = String(user.emp_id || '').trim().toLowerCase();
 
@@ -1115,16 +991,22 @@ function applyLeaveOrPermission(payload) {
         var existingStatusIdx = headers.indexOf('shift_status');
         var existingStatus = existingStatusIdx !== -1 ? String(data[i][existingStatusIdx]).toUpperCase() : '';
 
-        var newShiftStatus = isFullDayLeave ? 'LEAVE_CLOSED' : (existingStatus && existingStatus !== 'NOT_CLOCKED_IN' ? existingStatus : 'NOT_CLOCKED_IN');
-        var attStatus = isFullDayLeave ? leaveCode : (leaveCode === 'HL' ? 'HL' : (existingStatus === 'OPEN' || existingStatus === 'CLOSED' ? 'Present' : leaveCode));
+        var newShiftStatus = isPresentOverride ? 'CLOSED' : (isScheduleOff ? leaveCode : (isFullDayLeave ? 'LEAVE_CLOSED' : (existingStatus && existingStatus !== 'NOT_CLOCKED_IN' ? existingStatus : 'NOT_CLOCKED_IN')));
+        var attStatus = isPresentOverride ? 'Present' : (isScheduleOff ? leaveCode : (isFullDayLeave ? leaveCode : (leaveCode === 'HL' ? 'HL' : (existingStatus === 'OPEN' || existingStatus === 'CLOSED' ? 'Present' : leaveCode))));
 
         var rowValues = data[i];
         if (headers.indexOf('attendance_status') !== -1) rowValues[headers.indexOf('attendance_status')] = attStatus;
         if (headers.indexOf('permission_hours') !== -1) rowValues[headers.indexOf('permission_hours')] = permHrs;
         if (headers.indexOf('shrinkage_hours') !== -1) rowValues[headers.indexOf('shrinkage_hours')] = shrinkageHrs;
+        if (headers.indexOf('leave_hours') !== -1) rowValues[headers.indexOf('leave_hours')] = leaveHours;
+        if (headers.indexOf('shift_type') !== -1) rowValues[headers.indexOf('shift_type')] = shiftType;
         if (headers.indexOf('proof_url') !== -1 && proofUrl) rowValues[headers.indexOf('proof_url')] = proofUrl;
         if (headers.indexOf('shift_status') !== -1) rowValues[headers.indexOf('shift_status')] = newShiftStatus;
-        if (isFullDayLeave) {
+        if (isPresentOverride) {
+          if (headers.indexOf('shift_start_time') !== -1) rowValues[headers.indexOf('shift_start_time')] = '09:00:00';
+          if (headers.indexOf('shift_end_time') !== -1) rowValues[headers.indexOf('shift_end_time')] = '18:00:00';
+          if (headers.indexOf('total_shift_hours') !== -1) rowValues[headers.indexOf('total_shift_hours')] = stdShiftHours;
+        } else if (isFullDayLeave || isScheduleOff) {
           if (headers.indexOf('shift_start_time') !== -1) rowValues[headers.indexOf('shift_start_time')] = '';
           if (headers.indexOf('shift_end_time') !== -1) rowValues[headers.indexOf('shift_end_time')] = '';
           if (headers.indexOf('total_shift_hours') !== -1) rowValues[headers.indexOf('total_shift_hours')] = 0;
@@ -1133,7 +1015,7 @@ function applyLeaveOrPermission(payload) {
         if (headers.indexOf('active_project') !== -1 && projName) rowValues[headers.indexOf('active_project')] = projName;
         if (headers.indexOf('user_remarks') !== -1 && remarks) {
           var existingUserRem = String(data[i][headers.indexOf('user_remarks')] || '').trim();
-          var updatedUserRem = existingUserRem ? (existingUserRem + ' | User Update: ' + remarks) : remarks;
+          var updatedUserRem = existingUserRem ? (existingUserRem + ' | Update: ' + remarks) : remarks;
           rowValues[headers.indexOf('user_remarks')] = updatedUserRem;
         }
 
@@ -1145,7 +1027,9 @@ function applyLeaveOrPermission(payload) {
           shift_status: newShiftStatus,
           attendance_status: attStatus,
           permission_hours: permHrs,
-          message: 'Updated attendance record: ' + leaveCode + ' (' + permHrs + ' hrs permission/leave recorded)'
+          leave_hours: leaveHours,
+          shift_type: shiftType,
+          message: isPresentOverride ? ('Updated attendance: Present (' + stdShiftHours + ' hrs shift recorded)') : ('Updated attendance record: ' + leaveCode + ' (' + leaveHours + ' hrs leave/permission recorded)')
         };
       }
     }
@@ -1156,8 +1040,8 @@ function applyLeaveOrPermission(payload) {
     var newRow = new Array(headers.length);
     for (var h = 0; h < headers.length; h++) newRow[h] = '';
 
-    var newShiftStatus = isFullDayLeave ? 'LEAVE_CLOSED' : 'NOT_CLOCKED_IN';
-    var attStatus = isFullDayLeave ? leaveCode : (leaveCode === 'HL' ? 'HL' : 'Present');
+    var newShiftStatus = isPresentOverride ? 'CLOSED' : (isScheduleOff ? leaveCode : (isFullDayLeave ? 'LEAVE_CLOSED' : 'NOT_CLOCKED_IN'));
+    var attStatus = isPresentOverride ? 'Present' : (isScheduleOff ? leaveCode : (isFullDayLeave ? leaveCode : (leaveCode === 'HL' ? 'HL' : 'Present')));
 
     if (headers.indexOf('log_id') !== -1) newRow[headers.indexOf('log_id')] = logId;
     if (headers.indexOf('date') !== -1) newRow[headers.indexOf('date')] = targetDate;
@@ -1165,9 +1049,11 @@ function applyLeaveOrPermission(payload) {
     if (headers.indexOf('emp_name') !== -1) newRow[headers.indexOf('emp_name')] = user.emp_name;
     if (headers.indexOf('attendance_status') !== -1) newRow[headers.indexOf('attendance_status')] = attStatus;
     if (headers.indexOf('permission_hours') !== -1) newRow[headers.indexOf('permission_hours')] = permHrs;
-    if (headers.indexOf('shift_start_time') !== -1) newRow[headers.indexOf('shift_start_time')] = '';
-    if (headers.indexOf('shift_end_time') !== -1) newRow[headers.indexOf('shift_end_time')] = '';
-    if (headers.indexOf('total_shift_hours') !== -1) newRow[headers.indexOf('total_shift_hours')] = 0;
+    if (headers.indexOf('leave_hours') !== -1) newRow[headers.indexOf('leave_hours')] = leaveHours;
+    if (headers.indexOf('shift_type') !== -1) newRow[headers.indexOf('shift_type')] = shiftType;
+    if (headers.indexOf('shift_start_time') !== -1) newRow[headers.indexOf('shift_start_time')] = isPresentOverride ? '09:00:00' : '';
+    if (headers.indexOf('shift_end_time') !== -1) newRow[headers.indexOf('shift_end_time')] = isPresentOverride ? '18:00:00' : '';
+    if (headers.indexOf('total_shift_hours') !== -1) newRow[headers.indexOf('total_shift_hours')] = isPresentOverride ? stdShiftHours : 0;
     if (headers.indexOf('shrinkage_hours') !== -1) newRow[headers.indexOf('shrinkage_hours')] = shrinkageHrs;
     if (headers.indexOf('proof_url') !== -1) newRow[headers.indexOf('proof_url')] = proofUrl;
     if (headers.indexOf('shift_status') !== -1) newRow[headers.indexOf('shift_status')] = newShiftStatus;
@@ -1185,7 +1071,9 @@ function applyLeaveOrPermission(payload) {
       shift_status: newShiftStatus,
       attendance_status: attStatus,
       permission_hours: permHrs,
-      message: 'Submitted ' + leaveCode + ' (' + permHrs + ' hrs permission/leave recorded)'
+      leave_hours: leaveHours,
+      shift_type: shiftType,
+      message: isPresentOverride ? ('Recorded Present shift (' + stdShiftHours + ' hrs)') : ('Submitted ' + leaveCode + ' (' + leaveHours + ' hrs leave/permission recorded)')
     };
   } catch (err) {
     return { success: false, message: err.toString() };
@@ -1195,7 +1083,119 @@ function applyLeaveOrPermission(payload) {
 }
 
 /**
- * MANAGER DIRECT MARK LEAVE ENGINE (Supports Today & Past Dates)
+ * SET EMPLOYEE SCHEDULE STATUS (Single-Click Week Off / Holiday for Managers)
+ * Sets WO, HOLIDAY, or CLEAR for a specific employee and date.
+ */
+function setEmployeeScheduleStatus(payload) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) {
+    return { success: false, message: 'Server busy. Please try again.' };
+  }
+
+  try {
+    var empId = payload ? String(payload.emp_id || '').trim() : '';
+    var dateStr = payload ? String(payload.date || '').trim() : '';
+    var status = payload ? String(payload.status || '').trim().toUpperCase() : '';
+
+    if (!empId) return { success: false, message: 'Missing employee ID.' };
+    if (!dateStr) return { success: false, message: 'Missing target date.' };
+
+    var user = getUserByEmpId(empId);
+    if (!user) return { success: false, message: 'Employee not found: ' + empId };
+
+    var ss = getSpreadsheet();
+    var attSheet = ss.getSheetByName(SHEET_NAMES.ATTENDANCE);
+    if (!attSheet) return { success: false, message: 'Attendance sheet not found.' };
+
+    ensureAttendanceHeaders(attSheet);
+    var timeZone = Session.getScriptTimeZone();
+    var normalizedTargetDate = normalizeDateStr(dateStr, timeZone) || dateStr;
+
+    var data = attSheet.getDataRange().getValues();
+    var headers = data[0];
+    var empIdx = headers.indexOf('emp_id');
+    var dateIdx = headers.indexOf('date');
+    var attStatusIdx = headers.indexOf('attendance_status');
+    var shiftStatusIdx = headers.indexOf('shift_status');
+    var shiftHrsIdx = headers.indexOf('total_shift_hours');
+    var leaveHrsIdx = headers.indexOf('leave_hours');
+    var remarksIdx = headers.indexOf('user_remarks');
+    var shiftTypeIdx = headers.indexOf('shift_type');
+
+    var foundRow = -1;
+    var empLower = empId.toLowerCase();
+
+    for (var r = 1; r < data.length; r++) {
+      var rEmp = empIdx !== -1 ? String(data[r][empIdx]).trim().toLowerCase() : '';
+      var rDate = normalizeDateStr(data[r][dateIdx], timeZone);
+      if (rEmp === empLower && rDate === normalizedTargetDate) {
+        foundRow = r + 1;
+        break;
+      }
+    }
+
+    var defaultShift = normalizeShiftType(user.default_shift || 'General');
+
+    if (status === 'CLEAR') {
+      if (foundRow !== -1) {
+        if (attStatusIdx !== -1) attSheet.getRange(foundRow, attStatusIdx + 1).setValue('NOT_CLOCKED_IN');
+        if (shiftStatusIdx !== -1) attSheet.getRange(foundRow, shiftStatusIdx + 1).setValue('NOT_CLOCKED_IN');
+        if (shiftHrsIdx !== -1) attSheet.getRange(foundRow, shiftHrsIdx + 1).setValue(0);
+        if (leaveHrsIdx !== -1) attSheet.getRange(foundRow, leaveHrsIdx + 1).setValue(0);
+        if (remarksIdx !== -1) attSheet.getRange(foundRow, remarksIdx + 1).setValue('');
+      }
+      SpreadsheetApp.flush();
+      return { success: true, emp_id: empId, date: normalizedTargetDate, status: 'NOT_CLOCKED_IN', message: 'Cleared status for ' + user.emp_name };
+    }
+
+    var statusLabel = (status === 'WO' || status === 'WEEK_OFF' || status === 'WEEKOFF') ? 'WO' : 'HOLIDAY';
+    var remarks = (statusLabel === 'WO') ? 'Week Off set by Manager' : 'Holiday set by Manager';
+
+    if (foundRow !== -1) {
+      if (attStatusIdx !== -1) attSheet.getRange(foundRow, attStatusIdx + 1).setValue(statusLabel);
+      if (shiftStatusIdx !== -1) attSheet.getRange(foundRow, shiftStatusIdx + 1).setValue(statusLabel);
+      if (shiftHrsIdx !== -1) attSheet.getRange(foundRow, shiftHrsIdx + 1).setValue(0);
+      if (leaveHrsIdx !== -1) attSheet.getRange(foundRow, leaveHrsIdx + 1).setValue(0);
+      if (remarksIdx !== -1) attSheet.getRange(foundRow, remarksIdx + 1).setValue(remarks);
+    } else {
+      var logId = 'ATT-' + normalizedTargetDate.replace(/-/g, '') + '-' + empId.replace(/[^a-zA-Z0-9]/g, '') + '-' + Math.floor(100000 + Math.random() * 900000);
+      var newRow = new Array(headers.length);
+      for (var h = 0; h < headers.length; h++) newRow[h] = '';
+      if (headers.indexOf('log_id') !== -1) newRow[headers.indexOf('log_id')] = logId;
+      if (headers.indexOf('date') !== -1) newRow[headers.indexOf('date')] = normalizedTargetDate;
+      if (empIdx !== -1) newRow[empIdx] = user.emp_id;
+      if (headers.indexOf('emp_name') !== -1) newRow[headers.indexOf('emp_name')] = user.emp_name;
+      if (attStatusIdx !== -1) newRow[attStatusIdx] = statusLabel;
+      if (shiftStatusIdx !== -1) newRow[shiftStatusIdx] = statusLabel;
+      if (shiftTypeIdx !== -1) newRow[shiftTypeIdx] = defaultShift;
+      if (shiftHrsIdx !== -1) newRow[shiftHrsIdx] = 0;
+      if (leaveHrsIdx !== -1) newRow[leaveHrsIdx] = 0;
+      if (headers.indexOf('total_break_minutes') !== -1) newRow[headers.indexOf('total_break_minutes')] = 60;
+      if (headers.indexOf('active_client') !== -1) newRow[headers.indexOf('active_client')] = user.default_client || 'iMerit';
+      if (headers.indexOf('active_project') !== -1) newRow[headers.indexOf('active_project')] = user.default_project || 'Pravah';
+      if (remarksIdx !== -1) newRow[remarksIdx] = remarks;
+      if (headers.indexOf('created_at') !== -1) newRow[headers.indexOf('created_at')] = new Date();
+
+      attSheet.appendRow(newRow);
+    }
+
+    SpreadsheetApp.flush();
+    return {
+      success: true,
+      emp_id: empId,
+      date: normalizedTargetDate,
+      status: statusLabel,
+      message: 'Set ' + statusLabel + ' for ' + user.emp_name + ' on ' + normalizedTargetDate
+    };
+  } catch (err) {
+    return { success: false, message: err.toString() };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * MANAGER DIRECT MARK LEAVE ENGINE (Supports Today & Past Dates, WO and Holiday)
  */
 function markLeaveOnBehalfByManager(payload) {
   var lock = LockService.getScriptLock();
@@ -1217,13 +1217,22 @@ function markLeaveOnBehalfByManager(payload) {
 
     var timeZone = Session.getScriptTimeZone();
     var targetDate = normalizeDateStr(payload.date, timeZone) || Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd');
-    var leaveCode = payload.leave_type || 'UL';
-    var isFullDayLeave = (leaveCode === 'PL' || leaveCode === 'UL' || leaveCode === 'ABSENT');
-    var isShortPermAdmin = (leaveCode === 'PERM' || leaveCode === 'PERMISSION' || leaveCode === 'OD');
-    var permHrs = isShortPermAdmin ? (Number(payload.permission_hours) || 2.0) : 0.0;
-    var shrinkageHrs = isFullDayLeave ? 8.0 : (leaveCode === 'HL' ? 4.0 : permHrs);
-    var remarks = payload.remarks ? ('Manager Note: ' + payload.remarks) : 'Marked by Manager';
+    var rawLeaveCode = String(payload.leave_type || 'UL').trim().toUpperCase();
+    var leaveCode = rawLeaveCode;
+    if (leaveCode === 'WEEK OFF' || leaveCode === 'WEEKOFF') leaveCode = 'WO';
+    if (leaveCode === 'HOLIDAY') leaveCode = 'HOLIDAY';
 
+    var isScheduleOff = (leaveCode === 'WO' || leaveCode === 'HOLIDAY');
+    var isFullDayLeave = !isScheduleOff && (leaveCode === 'PL' || leaveCode === 'UL' || leaveCode === 'ABSENT');
+    var isShortPermAdmin = !isScheduleOff && (leaveCode === 'PERM' || leaveCode === 'PERMISSION' || leaveCode === 'OD');
+    var permHrs = isShortPermAdmin ? (Number(payload.permission_hours) || 2.0) : 0.0;
+    var shiftType = normalizeShiftType(payload.shift_type || payload.shift || user.default_shift || 'General');
+    var stdShiftHours = getShiftStandardHours(shiftType);
+    var leaveHours = isScheduleOff ? 0 : (isFullDayLeave ? stdShiftHours : (leaveCode === 'HL' ? (stdShiftHours / 2.0) : permHrs));
+    var shrinkageHrs = leaveHours;
+    var remarks = payload.remarks ? ('Manager Note: ' + payload.remarks) : (isScheduleOff ? (leaveCode === 'WO' ? 'Week Off set by Manager' : 'Holiday set by Manager') : 'Marked by Manager');
+
+    ensureAttendanceHeaders(sheet);
     var data = sheet.getDataRange().getValues();
     var headers = data[0];
     var empIdx = headers.indexOf('emp_id');
@@ -1237,14 +1246,16 @@ function markLeaveOnBehalfByManager(payload) {
 
       if (rowEmp === targetEmpLower && rowDate === targetDate) {
         var rowIndex = i + 1;
-        var newShiftStatus = isFullDayLeave ? 'LEAVE_CLOSED' : 'NOT_CLOCKED_IN';
+        var newShiftStatus = isScheduleOff ? leaveCode : (isFullDayLeave ? 'LEAVE_CLOSED' : 'NOT_CLOCKED_IN');
 
         var rowValues = data[i];
         if (headers.indexOf('attendance_status') !== -1) rowValues[headers.indexOf('attendance_status')] = leaveCode;
         if (headers.indexOf('permission_hours') !== -1) rowValues[headers.indexOf('permission_hours')] = permHrs;
         if (headers.indexOf('shrinkage_hours') !== -1) rowValues[headers.indexOf('shrinkage_hours')] = shrinkageHrs;
+        if (headers.indexOf('leave_hours') !== -1) rowValues[headers.indexOf('leave_hours')] = leaveHours;
+        if (headers.indexOf('shift_type') !== -1) rowValues[headers.indexOf('shift_type')] = shiftType;
         if (headers.indexOf('shift_status') !== -1) rowValues[headers.indexOf('shift_status')] = newShiftStatus;
-        if (isFullDayLeave) {
+        if (isFullDayLeave || isScheduleOff) {
           if (headers.indexOf('shift_start_time') !== -1) rowValues[headers.indexOf('shift_start_time')] = '';
           if (headers.indexOf('shift_end_time') !== -1) rowValues[headers.indexOf('shift_end_time')] = '';
           if (headers.indexOf('total_shift_hours') !== -1) rowValues[headers.indexOf('total_shift_hours')] = 0;
@@ -1262,7 +1273,9 @@ function markLeaveOnBehalfByManager(payload) {
           success: true,
           shift_status: newShiftStatus,
           attendance_status: leaveCode,
-          message: 'Successfully updated leave for ' + user.emp_name + ' on ' + targetDate + ' as ' + leaveCode
+          leave_hours: leaveHours,
+          shift_type: shiftType,
+          message: 'Successfully updated status for ' + user.emp_name + ' on ' + targetDate + ' as ' + leaveCode
         };
       }
     }
@@ -1273,7 +1286,7 @@ function markLeaveOnBehalfByManager(payload) {
     var newRow = new Array(headers.length);
     for (var h = 0; h < headers.length; h++) newRow[h] = '';
 
-    var newShiftStatus = isFullDayLeave ? 'LEAVE_CLOSED' : 'NOT_CLOCKED_IN';
+    var newShiftStatus = isScheduleOff ? leaveCode : (isFullDayLeave ? 'LEAVE_CLOSED' : 'NOT_CLOCKED_IN');
 
     if (headers.indexOf('log_id') !== -1) newRow[headers.indexOf('log_id')] = logId;
     if (headers.indexOf('date') !== -1) newRow[headers.indexOf('date')] = targetDate;
@@ -1281,6 +1294,8 @@ function markLeaveOnBehalfByManager(payload) {
     if (headers.indexOf('emp_name') !== -1) newRow[headers.indexOf('emp_name')] = user.emp_name;
     if (headers.indexOf('attendance_status') !== -1) newRow[headers.indexOf('attendance_status')] = leaveCode;
     if (headers.indexOf('permission_hours') !== -1) newRow[headers.indexOf('permission_hours')] = permHrs;
+    if (headers.indexOf('leave_hours') !== -1) newRow[headers.indexOf('leave_hours')] = leaveHours;
+    if (headers.indexOf('shift_type') !== -1) newRow[headers.indexOf('shift_type')] = shiftType;
     if (headers.indexOf('shift_start_time') !== -1) newRow[headers.indexOf('shift_start_time')] = '';
     if (headers.indexOf('shift_end_time') !== -1) newRow[headers.indexOf('shift_end_time')] = '';
     if (headers.indexOf('total_shift_hours') !== -1) newRow[headers.indexOf('total_shift_hours')] = 0;
@@ -1300,7 +1315,9 @@ function markLeaveOnBehalfByManager(payload) {
       log_id: logId,
       shift_status: newShiftStatus,
       attendance_status: leaveCode,
-      message: 'Successfully marked leave for ' + user.emp_name + ' on ' + targetDate + ' as ' + leaveCode
+      leave_hours: leaveHours,
+      shift_type: shiftType,
+      message: 'Successfully marked ' + leaveCode + ' for ' + user.emp_name + ' on ' + targetDate
     };
 
   } catch (err) {
@@ -1393,7 +1410,7 @@ function autoMarkUnappliedAbsences() {
 }
 
 /**
- * TASK LOGGING ENGINE (With Module A Non-Billable Exemptions & Mandatory Remarks)
+ * TASK LOGGING ENGINE (Cleaned: No AHT calculations, captures Client, Project, Activity, Hours Worked)
  */
 function logTaskEntry(payload) {
   var lock = LockService.getScriptLock();
@@ -1422,40 +1439,9 @@ function logTaskEntry(payload) {
     var cleanEmpIdTask = String(user.emp_id || '').trim().replace(/[^a-zA-Z0-9]/g, '');
     var taskLogId = 'TASK-' + todayStr.replace(/-/g, '') + (cleanEmpIdTask ? '-' + cleanEmpIdTask : '') + '-' + Math.floor(100000 + Math.random() * 900000);
 
-    var actType = String(payload.activity_type || 'Production Work').trim();
-    var actTypeLower = actType.toLowerCase();
-    var clientLower = String(payload.active_client || '').toLowerCase();
-    var projLower = String(payload.active_project || '').toLowerCase();
-
-    var isIdle = (actTypeLower.indexOf('downtime') !== -1 || actTypeLower.indexOf('allocation') !== -1 || actTypeLower.indexOf('waiting') !== -1 || projLower.indexOf('downtime') !== -1);
-    var isBench = (actTypeLower.indexOf('bench') !== -1 || actTypeLower.indexOf('training') !== -1 || actTypeLower.indexOf('upskilling') !== -1
-      || projLower.indexOf('bench') !== -1 || projLower.indexOf('unallocated') !== -1 || projLower.indexOf('floor management') !== -1 || projLower.indexOf('training') !== -1 || projLower.indexOf('upskilling') !== -1
-      || clientLower.indexOf('bench') !== -1 || clientLower.indexOf('floor management') !== -1 || clientLower.indexOf('unallocated') !== -1);
-
-    var isBillable = true;
-    if (payload.is_billable !== undefined && payload.is_billable !== null) {
-      isBillable = (payload.is_billable === true || String(payload.is_billable).toUpperCase() === 'TRUE');
-    } else {
-      var clientMaster = getClientMasterData();
-      var matchProj = clientMaster.find(function(cp) {
-        return String(cp.client_name).toUpperCase() === String(payload.active_client).toUpperCase() &&
-               String(cp.project_name).toUpperCase() === String(payload.active_project).toUpperCase() &&
-               String(cp.activity_type || '').toUpperCase() === actType.toUpperCase();
-      });
-      if (!matchProj) {
-        matchProj = clientMaster.find(function(cp) {
-          return String(cp.client_name).toUpperCase() === String(payload.active_client).toUpperCase() &&
-                 String(cp.project_name).toUpperCase() === String(payload.active_project).toUpperCase();
-        });
-      }
-      if (matchProj && matchProj.is_billable !== undefined) {
-        isBillable = (matchProj.is_billable === true || String(matchProj.is_billable).toUpperCase() === 'TRUE');
-      }
-    }
-
-    if (!isBillable || isIdle || isBench) {
-      isBillable = false;
-    }
+    var actType = normalizeActivityType(payload.activity_type);
+    var clientName = String(payload.active_client || '').trim();
+    var projectName = String(payload.active_project || '').trim();
 
     var actualLoggedHrs = 0;
     if (payload.actual_worked_hours !== undefined && payload.actual_worked_hours !== null && payload.actual_worked_hours !== '') {
@@ -1478,64 +1464,9 @@ function logTaskEntry(payload) {
     }
     actualLoggedHrs = Number(actualLoggedHrs.toFixed(2));
 
-    var taskCount = Number(payload.task_count) || 0;
-    var ahtBenchMins = Number(payload.aht_benchmark_mins);
-    if (isNaN(ahtBenchMins) || ahtBenchMins <= 0) {
-      var clientMasterDataList = getClientMasterData();
-      var matchProjAht = clientMasterDataList.find(function(cp) {
-        return String(cp.client_name).toUpperCase() === String(payload.active_client).toUpperCase() &&
-               String(cp.project_name).toUpperCase() === String(payload.active_project).toUpperCase() &&
-               String(cp.activity_type || '').toUpperCase() === actType.toUpperCase();
-      });
-      if (!matchProjAht) {
-        matchProjAht = clientMasterDataList.find(function(cp) {
-          return String(cp.client_name).toUpperCase() === String(payload.active_client).toUpperCase() &&
-                 String(cp.project_name).toUpperCase() === String(payload.active_project).toUpperCase();
-        });
-      }
-      ahtBenchMins = matchProjAht ? (Number(matchProjAht.aht_minutes) || 60) : 60;
-    }
-
-    var calculatedEarnedHrs = Number(((taskCount * ahtBenchMins) / 60).toFixed(2));
-
-    var productiveHours = 0.00; // Billable Earned Hours
-    var trainingEarnedHours = 0.00; // Bench / Training Earned Hours
-    var speedEfficiencyPct = 100;
-
-    if (isBench) {
-      trainingEarnedHours = 0.00;
-      speedEfficiencyPct = 100;
-    } else if (isIdle) {
-      productiveHours = 0.00;
-      trainingEarnedHours = 0.00;
-      speedEfficiencyPct = 0;
-    } else {
-      productiveHours = calculatedEarnedHrs;
-      speedEfficiencyPct = actualLoggedHrs > 0 ? Math.round((productiveHours / actualLoggedHrs) * 100) : 100;
-    }
-
-    var blockedMins = Number(payload.blocked_mins || payload.blocked_duration_mins) || 0;
-    var blockedHours = Number((blockedMins / 60).toFixed(2));
-
-    var performanceLeakageHrs = 0.00;
-    if (isBillable && !isBench && !isIdle) {
-      var grossLeak = Math.max(0, actualLoggedHrs - productiveHours);
-      performanceLeakageHrs = Number(Math.max(0, grossLeak - blockedHours).toFixed(2));
-    }
-
-    var idleHours = 0.00;
-    var benchHours = 0.00;
-
-    if (isBench) {
-      benchHours = actualLoggedHrs;
-      idleHours = 0.00;
-    } else if (isIdle) {
-      idleHours = actualLoggedHrs;
-      benchHours = 0.00;
-    } else if (!isBillable) {
-      benchHours = actualLoggedHrs;
-      idleHours = 0.00;
-    }
+    var idleHours = (actType === 'Idle') ? actualLoggedHrs : 0.00;
+    var benchHours = (actType === 'Training (Material Go-Through)') ? actualLoggedHrs : 0.00;
+    var blockedHours = (actType === 'Down Time') ? actualLoggedHrs : 0.00;
 
     var isEditRow = false;
     if (payload.task_log_id) {
@@ -1558,11 +1489,11 @@ function logTaskEntry(payload) {
 
     var row = [
       taskLogId, payload.log_id || '', user.emp_id, email,
-      payload.active_client || '', payload.active_project || '',
+      clientName, projectName,
       payload.task_status || 'COMPLETED', Number(payload.completion_pct) || 100,
       Utilities.formatDate(startTime, timeZone, 'yyyy-MM-dd HH:mm:ss'),
       Utilities.formatDate(endTime, timeZone, 'yyyy-MM-dd HH:mm:ss'),
-      taskCount, ahtBenchMins, actualLoggedHrs, productiveHours, speedEfficiencyPct, performanceLeakageHrs,
+      0, 0, actualLoggedHrs, actualLoggedHrs, 100, 0,
       payload.user_remarks || '', new Date(),
       actType, idleHours, benchHours, blockedHours
     ];
@@ -1769,7 +1700,7 @@ function autoClosePreviousOpenShiftsForUser(empId) {
 }
 
 /**
- * COMPLETE ADMIN DASHBOARD ENGINE
+ * CONSOLIDATED ADMIN DASHBOARD ENGINE (Day, Week, Month Periods + Work Log Breakdowns + Fixed 1h Daily Break)
  */
 function getAdminDashboardData(filters) {
   try {
@@ -1790,10 +1721,18 @@ function getAdminDashboardData(filters) {
     var targetDate = (filters && filters.date) ? normalizeDateStr(filters.date, timeZone) : todayStr;
     if (!targetDate) targetDate = todayStr;
 
+    var period = (filters && filters.period) ? String(filters.period).toLowerCase() : 'day';
+    if (['day', 'week', 'month'].indexOf(period) === -1) period = 'day';
+
+    var dateRange = getDateRangeForPeriod(targetDate, period, timeZone);
+    var startDate = dateRange.startDate;
+    var endDate = dateRange.endDate;
+
     var selectedClient = (filters && (filters.client || filters.active_client)) ? String(filters.client || filters.active_client).trim() : 'ALL';
     var selectedProject = (filters && (filters.project || filters.active_project)) ? String(filters.project || filters.active_project).trim() : 'ALL';
     var selectedTeam = (filters && filters.team) ? String(filters.team).trim() : 'ALL';
-    var selectedMode = (filters && filters.work_mode) ? String(filters.work_mode).trim() : 'ALL';
+    var selectedShift = (filters && filters.shift) ? String(filters.shift).trim() : 'ALL';
+    var selectedSearch = (filters && filters.search) ? String(filters.search).trim().toLowerCase() : '';
 
     var uSheet = ss.getSheetByName(SHEET_NAMES.USER_MASTER);
     var users = [];
@@ -1823,8 +1762,25 @@ function getAdminDashboardData(filters) {
       }
     }
 
+    // Extended query range for summary trends if period is month (allows historical Aug, Sep, Oct, Nov progression)
+    var queryStartDate = startDate;
+    var queryEndDate = endDate;
+    if (period === 'month') {
+      var tParts = targetDate.split('-');
+      var tY = parseInt(tParts[0], 10);
+      var tM = parseInt(tParts[1], 10) - 1;
+      var startQuarterDate = new Date(tY, Math.max(0, tM - 3), 1);
+      var qStartStr = Utilities.formatDate(startQuarterDate, timeZone, 'yyyy-MM-dd');
+      if (qStartStr < queryStartDate) {
+        queryStartDate = qStartStr;
+      }
+    }
+
+    // Load Attendance Logs in [queryStartDate, queryEndDate]
     var aSheet = ss.getSheetByName(SHEET_NAMES.ATTENDANCE);
-    var attendanceByEmp = {};
+    if (aSheet) ensureAttendanceHeaders(aSheet);
+    var attendanceByEmp = {}; // empKey -> array of attendance rows in selected [startDate, endDate]
+    var allAttendanceRows = []; // all rows in [queryStartDate, queryEndDate] for summary calculations
     if (aSheet) {
       var aData = aSheet.getDataRange().getValues();
       if (aData.length > 1) {
@@ -1834,8 +1790,7 @@ function getAdminDashboardData(filters) {
 
         for (var k = 1; k < aData.length; k++) {
           var rDate = normalizeDateStr(aData[k][aDateIdx], timeZone);
-
-          if (rDate === targetDate || !targetDate) {
+          if (rDate && rDate >= queryStartDate && rDate <= queryEndDate) {
             var aObj = {};
             for (var col = 0; col < aHeaders.length; col++) {
               var h = aHeaders[col];
@@ -1850,16 +1805,26 @@ function getAdminDashboardData(filters) {
                 aObj[h] = val !== null && val !== undefined ? val : '';
               }
             }
-            var empKey = aEmpIdx !== -1 ? String(aData[k][aEmpIdx]).trim().toLowerCase() : String(aObj.emp_id || '').trim().toLowerCase();
-            attendanceByEmp[empKey] = aObj;
+            aObj.normalizedDate = rDate;
+            aObj.shift_type = normalizeShiftType(aObj.shift_type || 'General');
+            aObj.leave_hours = Number(aObj.leave_hours) || 0;
+            allAttendanceRows.push(aObj);
+
+            if (rDate >= startDate && rDate <= endDate) {
+              var empKey = aEmpIdx !== -1 ? String(aData[k][aEmpIdx]).trim().toLowerCase() : String(aObj.emp_id || '').trim().toLowerCase();
+              if (!attendanceByEmp[empKey]) attendanceByEmp[empKey] = [];
+              attendanceByEmp[empKey].push(aObj);
+            }
           }
         }
       }
     }
 
+    // Load Project Task Logs in [queryStartDate, queryEndDate]
     var tSheet = ss.getSheetByName(SHEET_NAMES.PROJECT_LOGS);
     var tasksByEmp = {};
-    var taskLogs = [];
+    var rawTaskLogs = [];
+    var allQueryTasks = [];
     if (tSheet) {
       ensureProjectLogsHeaders(tSheet);
       var tData = tSheet.getDataRange().getValues();
@@ -1876,7 +1841,7 @@ function getAdminDashboardData(filters) {
             tDate = normalizeDateStr(tData[t][createdIdx], timeZone);
           }
 
-          if (tDate === targetDate || !targetDate) {
+          if (tDate && tDate >= queryStartDate && tDate <= queryEndDate) {
             var tObj = {};
             for (var col = 0; col < tHeaders.length; col++) {
               var h = tHeaders[col];
@@ -1888,47 +1853,45 @@ function getAdminDashboardData(filters) {
               }
             }
 
-            // Fallback for missing column names
-            if (tObj.activity_type === undefined && tData[t][18] !== undefined) tObj.activity_type = tData[t][18];
-            if (tObj.idle_hours === undefined && tData[t][19] !== undefined) tObj.idle_hours = tData[t][19];
-            if (tObj.bench_hours === undefined && tData[t][20] !== undefined) tObj.bench_hours = tData[t][20];
-            if (tObj.blocked_hours === undefined && tData[t][21] !== undefined) tObj.blocked_hours = tData[t][21];
+            // Normalize activity type to one of the 6 allowed activities
+            tObj.activity_type = normalizeActivityType(tObj.activity_type || tData[t][18]);
+            tObj.actual_worked_hours = Number(tObj.actual_worked_hours) || Number(tObj.hours_worked) || 0;
+            tObj.normalizedDate = tDate;
 
-            taskLogs.push(tObj);
-            var empKey = tEmpIdx !== -1 ? String(tData[t][tEmpIdx]).trim().toLowerCase() : String(tObj.emp_id || '').trim().toLowerCase();
-            if (!tasksByEmp[empKey]) tasksByEmp[empKey] = [];
-            tasksByEmp[empKey].push(tObj);
+            allQueryTasks.push(tObj);
+
+            if (tDate >= startDate && tDate <= endDate) {
+              rawTaskLogs.push(tObj);
+              var empKey = tEmpIdx !== -1 ? String(tData[t][tEmpIdx]).trim().toLowerCase() : String(tObj.emp_id || '').trim().toLowerCase();
+              if (!tasksByEmp[empKey]) tasksByEmp[empKey] = [];
+              tasksByEmp[empKey].push(tObj);
+            }
           }
         }
       }
     }
 
     var clientMaster = getClientMasterData();
-    var adminBillableMap = {};
-    if (clientMaster && clientMaster.length > 0) {
-      clientMaster.forEach(function(cp) {
-        var key = String(cp.client_name).toUpperCase() + '|||' + String(cp.project_name).toUpperCase();
-        adminBillableMap[key] = (cp.is_billable === true || String(cp.is_billable).toUpperCase() === 'TRUE');
-      });
-    }
 
+    // Aggregations
     var employeeStatusList = [];
     var leaveQueue = [];
-    var totalEmployees = users.length;
     var clockedInCount = 0;
-    var onBreakCount = 0;
-    var leaveCount = 0;
-    var notClockedInCount = 0;
-    var plCount = 0, ulCount = 0, hlCount = 0, permCount = 0;
-    var totalPermissionHours = 0;
+    var distinctLeaveStaffCount = 0;
 
-    var totalLoggedHours = 0; // Net Shift Worked Hours
-    var totalTaskHours = 0;   // Actual Logged Task Hours
-    var totalEarnedHours = 0;
-    var totalLeakageHours = 0;
-    var totalIdleHours = 0;
-    var totalBenchHours = 0;
-    var totalBlockedHours = 0;
+    var totalShiftWorkingHours = 0; // Net Shift Worked Hours (fixed 1h break deducted per day worked)
+    var totalLoggedWorkHours = 0;   // Actual Logged Task Hours across all activities
+    var totalPeriodLeaveHours = 0;  // Leave Hours kept separate from worked & prod hours
+
+    var activityHoursMap = {};
+    ALLOWED_ACTIVITIES.forEach(function(act) { activityHoursMap[act] = 0; });
+
+    var clientHoursMap = {};
+    var projectHoursMap = {};
+
+    var prodHeadcountDays = 0;
+    var supportHeadcountDays = 0;
+    var totalAvailablePeriodProdHours = 0;
 
     for (var uIdx = 0; uIdx < users.length; uIdx++) {
       var u = users[uIdx];
@@ -1938,256 +1901,871 @@ function getAdminDashboardData(filters) {
 
       var userEmpId = String(u.emp_id || '').trim();
       var userEmpKey = userEmpId.toLowerCase();
+      var userEmpName = String(u.emp_name || '');
+      var userTeam = String(u.team || 'N/A');
+
+      // Filter by Team
+      if (selectedTeam !== 'ALL' && userTeam.toUpperCase() !== selectedTeam.toUpperCase()) continue;
+
+      // Filter by Search string (emp_id, emp_name, team)
+      if (selectedSearch) {
+        var matchSearch = (userEmpId.toLowerCase().indexOf(selectedSearch) !== -1 ||
+          userEmpName.toLowerCase().indexOf(selectedSearch) !== -1 ||
+          userTeam.toLowerCase().indexOf(selectedSearch) !== -1);
+        if (!matchSearch) continue;
+      }
+
       var allEmpTasks = tasksByEmp[userEmpKey] || [];
-      var userClient = u.default_client || u.client || '';
-      var userProj = u.default_project || u.project || '';
 
-      if (selectedClient !== 'ALL' && userClient.toUpperCase() !== selectedClient.toUpperCase()) {
-        var hasClientTask = false;
-        for (var st = 0; st < allEmpTasks.length; st++) {
-          if (String(allEmpTasks[st].active_client).toUpperCase() === selectedClient.toUpperCase()) {
-            hasClientTask = true;
-            break;
-          }
-        }
-        if (!hasClientTask) continue;
-      }
-      if (selectedProject !== 'ALL' && userProj.toUpperCase() !== selectedProject.toUpperCase()) {
-        var hasProjTask = false;
-        for (var st = 0; st < allEmpTasks.length; st++) {
-          if (String(allEmpTasks[st].active_project).toUpperCase() === selectedProject.toUpperCase()) {
-            hasProjTask = true;
-            break;
-          }
-        }
-        if (!hasProjTask) continue;
-      }
-      if (selectedTeam !== 'ALL' && String(u.team).toUpperCase() !== selectedTeam.toUpperCase()) continue;
-      if (selectedMode !== 'ALL' && String(u.work_mode).toUpperCase() !== selectedMode.toUpperCase()) continue;
-
-      var att = attendanceByEmp[userEmpKey];
-      var empTasks = [];
+      // Filter tasks by Client and Project
+      var empFilteredTasks = [];
       for (var st = 0; st < allEmpTasks.length; st++) {
         var tsk = allEmpTasks[st];
         if (selectedClient !== 'ALL' && String(tsk.active_client).toUpperCase() !== selectedClient.toUpperCase()) continue;
         if (selectedProject !== 'ALL' && String(tsk.active_project).toUpperCase() !== selectedProject.toUpperCase()) continue;
-        empTasks.push(tsk);
+        empFilteredTasks.push(tsk);
       }
 
-      var empEarnedHrs = 0;
-      var empLeakageHrs = 0;
-      var empActualTaskHrs = 0;
-      var empIdleHrs = 0;
-      var empBenchHrs = 0;
-      var empBlockedHrs = 0;
+      // If client/project filter is active and employee has no matching tasks and their default is not matching, check
+      if (selectedClient !== 'ALL' || selectedProject !== 'ALL') {
+        var userDefClient = String(u.default_client || u.client || '').toUpperCase();
+        var userDefProj = String(u.default_project || u.project || '').toUpperCase();
+        var matchesDefault = (selectedClient === 'ALL' || userDefClient === selectedClient.toUpperCase()) &&
+                             (selectedProject === 'ALL' || userDefProj === selectedProject.toUpperCase());
+        if (empFilteredTasks.length === 0 && !matchesDefault) continue;
+      }
 
-      for (var tskIdx = 0; tskIdx < empTasks.length; tskIdx++) {
-        var tsk = empTasks[tskIdx];
-        var tClient = String(tsk.active_client || '').trim();
-        var tProject = String(tsk.active_project || '').trim();
-        var bKey = tClient.toUpperCase() + '|||' + tProject.toUpperCase();
-        var isTaskBillable = adminBillableMap[bKey] !== undefined ? adminBillableMap[bKey] : true;
+      var empAttendanceRows = attendanceByEmp[userEmpKey] || [];
 
-        var actCategory = String(tsk.activity_category || tsk.activity_type || '').trim().toLowerCase();
-        var tProjLower = tProject.toLowerCase();
-        var tClientLower = tClient.toLowerCase();
+      // Determine Employee Primary Shift
+      var empShiftType = 'General';
+      for (var sIdx = empAttendanceRows.length - 1; sIdx >= 0; sIdx--) {
+        if (empAttendanceRows[sIdx].shift_type) {
+          empShiftType = normalizeShiftType(empAttendanceRows[sIdx].shift_type);
+          break;
+        }
+      }
+      if (!empShiftType) empShiftType = normalizeShiftType(u.default_shift || 'General');
 
-        var isTaskBench = (tProjLower.indexOf('bench') !== -1 || tProjLower.indexOf('floor management') !== -1 || tProjLower.indexOf('unallocated') !== -1 || tProjLower.indexOf('training') !== -1 || tProjLower.indexOf('upskilling') !== -1)
-          || (tClientLower.indexOf('bench') !== -1 || tClientLower.indexOf('floor management') !== -1 || tClientLower.indexOf('unallocated') !== -1)
-          || (actCategory.indexOf('bench') !== -1 || actCategory.indexOf('training') !== -1 || actCategory.indexOf('upskilling') !== -1);
+      // Filter by Shift if applicable
+      if (selectedShift !== 'ALL' && empShiftType.toUpperCase() !== selectedShift.toUpperCase()) {
+        continue;
+      }
 
-        var isTaskIdle = (actCategory.indexOf('downtime') !== -1 || actCategory.indexOf('allocation') !== -1 || actCategory.indexOf('waiting') !== -1 || tProjLower.indexOf('downtime') !== -1);
+      // Determine Prod vs Support Headcount
+      var userDesig = String(u.job_designation || u.designation || '').toUpperCase();
+      var userRoleUpper = String(u.app_role || u.role || '').toUpperCase();
+      var userTeamUpper = userTeam.toUpperCase();
+      var isSupportStaff = (userDesig && ['TL', 'LEAD', 'MANAGER', 'QA', 'SUPPORT', 'TRAINER', 'SME', 'OPS'].indexOf(userDesig) !== -1) ||
+                           (userRoleUpper && ['ADMIN', 'MANAGER', 'LEAD', 'MANAGEMENT'].indexOf(userRoleUpper) !== -1) ||
+                           (userTeamUpper === 'MANAGEMENT' || userTeamUpper === 'SUPPORT');
+      var isProdStaff = !isSupportStaff;
 
-        var tskActual = Number(tsk.actual_worked_hours);
-        if (isNaN(tskActual) || tskActual <= 0) {
-          if (tsk.work_start_time && tsk.work_end_time) {
+      // Calculate Net Shift Working Hours and Leave Hours
+      var empNetShiftHours = 0;
+      var empLeaveHours = 0;
+      var workedDaysSet = {};
+      var leaveDaysCount = 0;
+      var latestShiftStatus = 'NOT_CLOCKED_IN';
+      var latestAttStatus = 'NOT_CLOCKED_IN';
+      var latestShiftStart = '--:--';
+      var latestShiftEnd = '--:--';
+
+      for (var aIdx = 0; aIdx < empAttendanceRows.length; aIdx++) {
+        var attRow = empAttendanceRows[aIdx];
+        var rowStatus = String(attRow.shift_status || 'NOT_CLOCKED_IN').toUpperCase();
+        var rowAttStatus = String(attRow.attendance_status || '').toUpperCase();
+        var rowDate = attRow.normalizedDate;
+        var rowShiftType = normalizeShiftType(attRow.shift_type || empShiftType);
+        var rowStdShiftHrs = getShiftStandardHours(rowShiftType);
+
+        var isScheduleOff = (rowAttStatus === 'WO' || rowStatus === 'WO' || rowAttStatus === 'HOLIDAY' || rowStatus === 'HOLIDAY');
+
+        var isLeave = !isScheduleOff && (['PL', 'UL', 'HL', 'PERMISSION', 'LEAVE_CLOSED'].indexOf(rowAttStatus) !== -1 || rowStatus === 'LEAVE_CLOSED');
+        if (isLeave) {
+          leaveDaysCount++;
+
+          var rowLeaveHrs = Number(attRow.leave_hours) || 0;
+          if (rowLeaveHrs <= 0) {
+            if (rowAttStatus === 'PL' || rowAttStatus === 'UL' || rowAttStatus === 'ABSENT' || rowStatus === 'LEAVE_CLOSED') {
+              rowLeaveHrs = rowStdShiftHrs;
+            } else if (rowAttStatus === 'HL') {
+              rowLeaveHrs = rowStdShiftHrs / 2.0;
+            } else {
+              rowLeaveHrs = Number(attRow.permission_hours) || 0;
+            }
+          }
+          empLeaveHours += rowLeaveHrs;
+          totalPeriodLeaveHours += rowLeaveHrs;
+
+          leaveQueue.push({
+            emp_id: userEmpId,
+            emp_name: userEmpName,
+            team: userTeam,
+            leave_type: rowAttStatus || 'LEAVE',
+            perm_hours: Number(attRow.permission_hours) || 0,
+            leave_hours: rowLeaveHrs,
+            date: rowDate,
+            proof_url: String(attRow.proof_url || '')
+          });
+        }
+
+        var isWorked = !isScheduleOff && (rowStatus === 'OPEN' || rowStatus === 'CLOSED' || rowAttStatus === 'PRESENT');
+        if (isWorked && !isLeave) {
+          workedDaysSet[rowDate] = true;
+          var rowHours = Number(attRow.total_shift_hours) || 0;
+
+          if (rowStatus === 'OPEN' && rowDate === todayStr && attRow.shift_start_time) {
             try {
-              var st = new Date(tsk.work_start_time).getTime();
-              var et = new Date(tsk.work_end_time).getTime();
-              if (et > st) tskActual = (et - st) / (1000 * 60 * 60);
-            } catch(e) { tskActual = 0; }
+              var st = parseTimeStringToDate(attRow.shift_start_time, todayStr, timeZone);
+              var nowD = new Date();
+              if (st && nowD > st) {
+                var grossHrs = (nowD.getTime() - st.getTime()) / (1000 * 60 * 60);
+                rowHours = Math.max(0, grossHrs - 1.0); // 1-hour break automatically excluded
+              }
+            } catch(e) {}
+          } else if (rowHours <= 0 && attRow.shift_start_time && attRow.shift_end_time) {
+            try {
+              var st = parseTimeStringToDate(attRow.shift_start_time, rowDate, timeZone);
+              var et = parseTimeStringToDate(attRow.shift_end_time, rowDate, timeZone);
+              if (st && et && et > st) {
+                var grossHrs = (et.getTime() - st.getTime()) / (1000 * 60 * 60);
+                rowHours = Math.max(0, grossHrs - 1.0); // 1-hour break automatically excluded
+              }
+            } catch(e) {}
           }
-        }
-        tskActual = Number(tskActual) || 0;
-        empActualTaskHrs += tskActual;
 
-        var taskIdle = 0;
-        var taskBench = 0;
-        var taskBlocked = Number(tsk.blocked_hours || tsk.blocked_duration_hours) || (Number(tsk.blocked_mins) ? Number((Number(tsk.blocked_mins)/60).toFixed(2)) : 0);
-
-        if (isTaskBench) {
-          taskBench = Number(tsk.bench_hours) || tskActual;
-          taskIdle = 0;
-        } else if (isTaskIdle) {
-          taskIdle = Number(tsk.idle_hours) || tskActual;
-          taskBench = 0;
-        } else if (!isTaskBillable) {
-          taskBench = Number(tsk.bench_hours) || tskActual;
-          taskIdle = 0;
-        } else {
-          taskIdle = Number(tsk.idle_hours) || 0;
-          taskBench = Number(tsk.bench_hours) || 0;
+          empNetShiftHours += rowHours;
         }
 
-        var taskProd = (isTaskBillable && !isTaskIdle && !isTaskBench) ? (Number(tsk.productive_hours) || 0) : 0;
-        var taskLeak = (isTaskBillable && !isTaskIdle && !isTaskBench) ? (Number(tsk.performance_leakage_hours) || 0) : 0;
-
-        empEarnedHrs += taskProd;
-        empLeakageHrs += taskLeak;
-        empIdleHrs += taskIdle;
-        empBenchHrs += taskBench;
-        empBlockedHrs += taskBlocked;
+        // Keep track of latest shift status for roster display
+        if (aIdx === empAttendanceRows.length - 1 || rowDate === todayStr) {
+          latestShiftStatus = isScheduleOff ? ((rowAttStatus === 'WO' || rowStatus === 'WO') ? 'WO' : 'HOLIDAY') : rowStatus;
+          latestAttStatus = isScheduleOff ? latestShiftStatus : (rowAttStatus || rowStatus);
+          if (attRow.shift_start_time) latestShiftStart = attRow.shift_start_time instanceof Date ? Utilities.formatDate(attRow.shift_start_time, timeZone, 'HH:mm:ss') : String(attRow.shift_start_time);
+          if (attRow.shift_end_time) latestShiftEnd = attRow.shift_end_time instanceof Date ? Utilities.formatDate(attRow.shift_end_time, timeZone, 'HH:mm:ss') : String(attRow.shift_end_time);
+        }
       }
 
-      var shiftStatus = att ? String(att.shift_status || 'NOT_CLOCKED_IN').toUpperCase() : 'NOT_CLOCKED_IN';
-      var attStatus = att ? String(att.attendance_status || 'NOT_CLOCKED_IN').toUpperCase() : 'NOT_CLOCKED_IN';
-      var breakMins = att ? Number(att.total_break_minutes) || 0 : 0;
-      var permHrs = att ? (Number(att.permission_hours) || 0) : 0;
-
-      var isFullDayLeave = (attStatus === 'PL' || attStatus === 'UL' || attStatus === 'ABSENT' || shiftStatus === 'LEAVE_CLOSED');
-      var isHalfDayLeave = (attStatus === 'HL');
-      var isFullOrHalfLeave = (isFullDayLeave || isHalfDayLeave);
-      var realPermHrs = isFullOrHalfLeave ? 0 : permHrs;
-
-      // STRICT ZERO-LEAVE INTEGRITY RULE: Full-Day Leave MUST ALWAYS BE 0.00 hrs
-      var rawWorkedHours = att ? Number(att.total_shift_hours) || 0 : 0;
-      if (rawWorkedHours <= 0 && att && att.shift_start_time && (shiftStatus === 'OPEN' || shiftStatus === 'ON_BREAK') && targetDate === todayStr) {
-        try {
-          var st = parseTimeStringToDate(att.shift_start_time, targetDate, timeZone);
-          var nowD = new Date();
-          if (st && nowD > st) {
-            rawWorkedHours = Math.max(0, ((nowD.getTime() - st.getTime()) / (1000 * 60 * 60)) - (breakMins / 60));
-          }
-        } catch(err) {}
-      } else if (rawWorkedHours <= 0 && att && att.shift_start_time && att.shift_end_time) {
-        try {
-          var st = parseTimeStringToDate(att.shift_start_time, targetDate, timeZone);
-          var et = parseTimeStringToDate(att.shift_end_time, targetDate, timeZone);
-          if (st && et && et > st) {
-            rawWorkedHours = Math.max(0, ((et.getTime() - st.getTime()) / (1000 * 60 * 60)) - (breakMins / 60));
-          }
-        } catch(err) {}
-      }
-      var workedHours = isFullDayLeave ? 0.00 : (isHalfDayLeave ? Math.min(4.50, rawWorkedHours) : rawWorkedHours);
-
-      if (attStatus === 'PL') {
-        plCount++;
-      } else if (attStatus === 'UL') {
-        ulCount++;
-      } else if (attStatus === 'HL') {
-        hlCount++;
+      if (leaveDaysCount > 0) {
+        distinctLeaveStaffCount++;
       }
 
-      if (!isFullOrHalfLeave && (realPermHrs > 0 || attStatus === 'PERMISSION' || attStatus === 'PERM' || attStatus.indexOf('PERM') !== -1)) {
-        permCount++;
-        totalPermissionHours += realPermHrs;
+      var isEmpActiveInPeriod = false;
+      if (period === 'day') {
+        isEmpActiveInPeriod = (latestShiftStatus === 'OPEN' || latestShiftStatus === 'CLOSED' || latestAttStatus === 'PRESENT');
+      } else {
+        isEmpActiveInPeriod = (Object.keys(workedDaysSet).length > 0 || empFilteredTasks.length > 0 || latestShiftStatus === 'OPEN' || latestShiftStatus === 'CLOSED');
       }
-
-      if (shiftStatus === 'OPEN' || shiftStatus === 'ON_BREAK' || shiftStatus === 'CLOSED' || attStatus === 'PRESENT') {
+      if (isEmpActiveInPeriod) {
         clockedInCount++;
       }
 
-      if (shiftStatus === 'ON_BREAK') {
-        onBreakCount++;
-      } else if (['PL', 'UL', 'HL', 'PERMISSION', 'LEAVE_CLOSED'].indexOf(attStatus) !== -1 || shiftStatus === 'LEAVE_CLOSED') {
-        leaveCount++;
+      // Aggregate Work Logs for this Employee
+      var empActualTaskHrs = 0;
+      var empActBreakdown = {};
+      ALLOWED_ACTIVITIES.forEach(function(act) { empActBreakdown[act] = 0; });
+      var empClientHours = {};
+      var empProjHours = {};
 
-        leaveQueue.push({
-          emp_id: String(u.emp_id || ''),
-          emp_name: String(u.emp_name || ''),
-          team: String(u.team || 'N/A'),
-          leave_type: String(attStatus),
-          perm_hours: permHrs,
-          proof_url: att ? String(att.proof_url || '') : '',
-          active_client: att ? String(att.active_client || u.default_client || 'iMerit') : String(u.default_client || 'iMerit'),
-          active_project: att ? String(att.active_project || u.default_project || 'Pravah') : String(u.default_project || 'Pravah')
-        });
-      } else if (shiftStatus === 'NOT_CLOCKED_IN' || (!shiftStatus && !isFullOrHalfLeave)) {
-        notClockedInCount++;
+      for (var tskIdx = 0; tskIdx < empFilteredTasks.length; tskIdx++) {
+        var tsk = empFilteredTasks[tskIdx];
+        var hrs = Number(tsk.actual_worked_hours) || 0;
+        var act = tsk.activity_type || 'Production';
+        var cl = String(tsk.active_client || 'General').trim();
+        var pr = String(tsk.active_project || 'Standard').trim();
+
+        empActualTaskHrs += hrs;
+        empActBreakdown[act] = (empActBreakdown[act] || 0) + hrs;
+        empClientHours[cl] = (empClientHours[cl] || 0) + hrs;
+        empProjHours[pr] = (empProjHours[pr] || 0) + hrs;
+
+        // Global breakdowns
+        activityHoursMap[act] = (activityHoursMap[act] || 0) + hrs;
+        clientHoursMap[cl] = (clientHoursMap[cl] || 0) + hrs;
+        var projKey = cl + '|||' + pr;
+        projectHoursMap[projKey] = (projectHoursMap[projKey] || 0) + hrs;
       }
 
-      totalLoggedHours += workedHours; // Net Shift Worked Hours
-      totalTaskHours += empActualTaskHrs;
-      totalEarnedHours += empEarnedHrs;
-      totalLeakageHours += empLeakageHrs;
-      totalIdleHours += empIdleHrs;
-      totalBenchHours += empBenchHrs;
-      totalBlockedHours += empBlockedHrs;
+      totalShiftWorkingHours += empNetShiftHours;
+      totalLoggedWorkHours += empActualTaskHrs;
 
-      var shiftStartStr = '--:--';
-      var shiftEndStr = '--:--';
-      if (!isFullDayLeave) {
-        if (att && att.shift_start_time) {
-          shiftStartStr = att.shift_start_time instanceof Date ? Utilities.formatDate(att.shift_start_time, timeZone, 'HH:mm:ss') : String(att.shift_start_time);
+      // Available Production Hours & Headcount calculation:
+      // Support Headcount: calculated from records where activity_type === 'Support' or role is Support.
+      // Support headcount is NOT counted toward Production Hours.
+      // Production Hours calculated using only employees assigned to Production, Idle, Down Time, Client Meeting, or Internal Meeting.
+      // Exclude Support and Training from Production Hours.
+      // Resources marked WO or Holiday are excluded from Production Head Count for affected dates.
+      var workedDaysCount = Object.keys(workedDaysSet).length;
+      if (workedDaysCount === 0 && empFilteredTasks.length > 0) workedDaysCount = 1;
+
+      var hasSupportTask = (empActBreakdown['Support'] > 0);
+      var hasProdTask = (empActBreakdown['Production'] > 0 || empActBreakdown['Idle'] > 0 || empActBreakdown['Down Time'] > 0 || empActBreakdown['Client Meeting'] > 0 || empActBreakdown['Internal Meeting'] > 0);
+      var onlyTraining = !hasSupportTask && !hasProdTask && (empActBreakdown['Training (Material Go-Through)'] > 0);
+      var isScheduleOffEmp = (latestShiftStatus === 'WO' || latestShiftStatus === 'HOLIDAY');
+
+      if (!isScheduleOffEmp && workedDaysCount > 0) {
+        if (hasSupportTask) {
+          supportHeadcountDays += workedDaysCount;
         }
-        if (att && att.shift_end_time) {
-          shiftEndStr = att.shift_end_time instanceof Date ? Utilities.formatDate(att.shift_end_time, timeZone, 'HH:mm:ss') : String(att.shift_end_time);
+        if (hasProdTask) {
+          prodHeadcountDays += workedDaysCount;
+          var stdHours = getShiftStandardHours(empShiftType);
+          totalAvailablePeriodProdHours += (stdHours * workedDaysCount);
+        }
+        // If neither specific task logged, fall back to designation/role:
+        if (!hasSupportTask && !hasProdTask && !onlyTraining) {
+          if (isSupportStaff) {
+            supportHeadcountDays += workedDaysCount;
+          } else {
+            prodHeadcountDays += workedDaysCount;
+            var stdHours = getShiftStandardHours(empShiftType);
+            totalAvailablePeriodProdHours += (stdHours * workedDaysCount);
+          }
+        }
+      }
+
+      // Find top client and project for this employee
+      var topClient = u.default_client || u.client || 'N/A';
+      var topClientHrs = -1;
+      for (var c in empClientHours) {
+        if (empClientHours[c] > topClientHrs) {
+          topClientHrs = empClientHours[c];
+          topClient = c;
+        }
+      }
+
+      var topProj = u.default_project || u.project || 'N/A';
+      var topProjHrs = -1;
+      for (var p in empProjHours) {
+        if (empProjHours[p] > topProjHrs) {
+          topProjHrs = empProjHours[p];
+          topProj = p;
         }
       }
 
       employeeStatusList.push({
-        emp_id: String(u.emp_id || ''),
-        emp_name: String(u.emp_name || ''),
+        emp_id: userEmpId,
+        emp_name: userEmpName,
         email: String(u.email || ''),
-        team: String(u.team || 'N/A'),
+        team: userTeam,
         work_mode: String(u.work_mode || 'Office'),
         app_role: String(u.app_role || 'User'),
-        shift_status: String(shiftStatus),
-        attendance_status: String(attStatus),
-        log_id: att ? String(att.log_id || '') : '',
-        shift_start_time: shiftStartStr,
-        shift_end_time: shiftEndStr,
-        total_break_minutes: Number(breakMins),
-        permission_hours: Number(permHrs),
-        total_shift_hours: Number(workedHours.toFixed ? workedHours.toFixed(2) : workedHours),
-        actual_worked_hours: Number(empActualTaskHrs.toFixed(2)),
-        earned_hours: Number(empEarnedHrs.toFixed(2)),
-        leakage_hours: Number(empLeakageHrs.toFixed(2)),
-        idle_hours: Number(empIdleHrs.toFixed(2)),
-        bench_hours: Number(empBenchHrs.toFixed(2)),
-        blocked_hours: Number(empBlockedHrs.toFixed(2)),
-        proof_url: att ? String(att.proof_url || '') : '',
-        tasks_count: empTasks.length,
-        tasks: empTasks
+        job_designation: userDesig || (isSupportStaff ? 'Support' : 'Associate'),
+        role_type: isSupportStaff ? 'Support' : 'Production',
+        shift_type: empShiftType,
+        shift_status: latestShiftStatus,
+        attendance_status: latestAttStatus || latestShiftStatus,
+        shift_start_time: latestShiftStart,
+        shift_end_time: latestShiftEnd,
+        days_worked: Object.keys(workedDaysSet).length,
+        days_leave: leaveDaysCount,
+        leave_hours: Number(empLeaveHours.toFixed(2)),
+        net_shift_hours: Number(empNetShiftHours.toFixed(2)),
+        total_shift_hours: Number(empNetShiftHours.toFixed(2)), // Alias for compatibility
+        total_task_hours: Number(empActualTaskHrs.toFixed(2)),
+        actual_worked_hours: Number(empActualTaskHrs.toFixed(2)), // Alias for compatibility
+        activity_breakdown: empActBreakdown,
+        primary_client: topClient,
+        primary_project: topProj,
+        tasks_count: empFilteredTasks.length,
+        tasks: empFilteredTasks
       });
     }
 
-    var totalEmployees = employeeStatusList.length;
-    var shrinkageRate = totalEmployees > 0 ? Number(((leaveCount / totalEmployees) * 100).toFixed(2)) : 0;
-    var overallSpeedPct = totalTaskHours > 0 ? Math.round((totalEarnedHours / totalTaskHours) * 100) : 100;
+    // Format Breakdown Lists
+    var timeByActivity = ALLOWED_ACTIVITIES.map(function(act) {
+      var hrs = Number((activityHoursMap[act] || 0).toFixed(2));
+      var pct = totalLoggedWorkHours > 0 ? Number(((hrs / totalLoggedWorkHours) * 100).toFixed(1)) : 0;
+      return { activity: act, hours: hrs, percentage: pct };
+    });
+
+    var timeByClient = Object.keys(clientHoursMap).map(function(cl) {
+      var hrs = Number((clientHoursMap[cl] || 0).toFixed(2));
+      var pct = totalLoggedWorkHours > 0 ? Number(((hrs / totalLoggedWorkHours) * 100).toFixed(1)) : 0;
+      return { client: cl, hours: hrs, percentage: pct };
+    }).sort(function(a, b) { return b.hours - a.hours; });
+
+    var timeByProject = Object.keys(projectHoursMap).map(function(cpKey) {
+      var parts = cpKey.split('|||');
+      var cl = parts[0];
+      var pr = parts[1] || '';
+      var hrs = Number((projectHoursMap[cpKey] || 0).toFixed(2));
+      var pct = totalLoggedWorkHours > 0 ? Number(((hrs / totalLoggedWorkHours) * 100).toFixed(1)) : 0;
+      return { client: cl, project: pr, hours: hrs, percentage: pct };
+    }).sort(function(a, b) { return b.hours - a.hours; });
+
+    var productionHours = Number((activityHoursMap['Production'] || 0).toFixed(2));
+    var meetingHours = Number(((activityHoursMap['Client Meeting'] || 0) + (activityHoursMap['Internal Meeting'] || 0)).toFixed(2));
+    var trainingHours = Number((activityHoursMap['Training (Material Go-Through)'] || 0).toFixed(2));
+    var downtimeIdleHours = Number(((activityHoursMap['Idle'] || 0) + (activityHoursMap['Down Time'] || 0)).toFixed(2));
+
+    // BUILD EXECUTIVE PRODUCTIVITY & HEADCOUNT SUMMARY TABLE (Matching Spreadsheet Reference)
+    var summaryTable = buildProductivitySummaryTable(
+      allQueryTasks,
+      allAttendanceRows,
+      users,
+      period,
+      targetDate,
+      startDate,
+      endDate,
+      selectedClient,
+      selectedProject,
+      selectedTeam,
+      selectedShift,
+      timeZone
+    );
+
+    var totalAvailProdHrs = summaryTable.total ? summaryTable.total.totalAvailableProdHrs : Number(totalAvailablePeriodProdHours.toFixed(2));
+    var prodUtilizationPct = totalAvailProdHrs > 0 ? Number(((productionHours / totalAvailProdHrs) * 100).toFixed(2)) : 0;
 
     return {
       success: true,
       targetDate: targetDate,
+      period: period,
+      dateRange: dateRange,
+      selectedShift: selectedShift,
       summary: {
-        totalEmployees: totalEmployees,
+        totalEmployees: employeeStatusList.length,
         clockedInCount: clockedInCount,
-        onBreakCount: onBreakCount,
-        leaveCount: leaveCount,
-        notClockedInCount: notClockedInCount,
-        plCount: plCount,
-        ulCount: ulCount,
-        hlCount: hlCount,
-        permCount: permCount,
-        totalPermissionHours: Number(totalPermissionHours.toFixed(2)),
-        shrinkageRate: shrinkageRate,
-        totalLoggedHours: Number(totalLoggedHours.toFixed(2)),
-        totalTaskHours: Number(totalTaskHours.toFixed(2)),
-        totalEarnedHours: Number(totalEarnedHours.toFixed(2)),
-        totalLeakageHours: Number(totalLeakageHours.toFixed(2)),
-        totalIdleHours: Number(totalIdleHours.toFixed(2)),
-        totalBenchHours: Number(totalBenchHours.toFixed(2)),
-        totalBlockedHours: Number(totalBlockedHours.toFixed(2)),
-        overallSpeedPct: overallSpeedPct
+        leaveCount: distinctLeaveStaffCount,
+        totalLeaveHours: Number(totalPeriodLeaveHours.toFixed(2)),
+        totalShiftHours: Number(totalShiftWorkingHours.toFixed(2)),
+        totalLoggedHours: Number(totalLoggedWorkHours.toFixed(2)),
+        totalTaskHours: Number(totalLoggedWorkHours.toFixed(2)),
+        productionHours: productionHours,
+        supportHours: Number((activityHoursMap['Support'] || 0).toFixed(2)),
+        totalAvailableProductionHours: totalAvailProdHrs,
+        productionUtilizationPct: prodUtilizationPct,
+        meetingHours: meetingHours,
+        trainingHours: trainingHours,
+        downtimeIdleHours: downtimeIdleHours,
+        avgProdHeadCount: summaryTable.total ? summaryTable.total.prodHeadCount : 0,
+        avgSupportHeadCount: summaryTable.total ? summaryTable.total.supportHeadCount : 0,
+        // Backward compatibility properties
+        notClockedInCount: Math.max(0, employeeStatusList.length - clockedInCount - distinctLeaveStaffCount),
+        onBreakCount: 0
       },
+      summaryTable: summaryTable,
+      timeByActivity: timeByActivity,
+      timeByClient: timeByClient,
+      timeByProject: timeByProject,
       employeeStatusList: employeeStatusList,
       leaveQueue: leaveQueue,
       clientMaster: clientMaster,
-      rawTaskLogs: taskLogs
+      rawTaskLogs: rawTaskLogs,
+      spreadsheetUrl: ss ? ss.getUrl() : ''
     };
   } catch (err) {
     return { success: false, message: 'Admin Data Error: ' + err.toString() };
   }
+}
+
+/**
+ * BUILDS EXECUTIVE PRODUCTIVITY & HEADCOUNT SUMMARY TABLE
+ * Directly modeled from the spreadsheet reference.
+ * Formulas:
+ * - General Shift: Avg Prod HC * 8 hrs * Working Days
+ * - 1st, Afternoon, 2nd: Avg Prod HC * 7 hrs * Working Days
+ * - Prod Utilization % = (Active Prod Hrs / Total Available Prod Hrs) * 100
+ * - Non Productive % = ((Training + Idle + Down Time + Meeting) / Total Available Prod Hrs) * 100
+ */
+function buildProductivitySummaryTable(
+  allTasks,
+  allAttendance,
+  users,
+  period,
+  targetDate,
+  startDate,
+  endDate,
+  selectedClient,
+  selectedProject,
+  selectedTeam,
+  selectedShift,
+  timeZone
+) {
+  timeZone = timeZone || Session.getScriptTimeZone();
+  var rows = [];
+
+  // 1. Build lookup for users
+  var userMap = {};
+  var userList = [];
+  for (var u = 0; u < users.length; u++) {
+    var usr = users[u];
+    var empKey = String(usr.emp_id || '').trim().toLowerCase();
+    var desig = String(usr.job_designation || usr.designation || '').toUpperCase();
+    var role = String(usr.app_role || usr.role || '').toUpperCase();
+    var tm = String(usr.team || '').toUpperCase();
+
+    var isSupport = (desig && ['TL', 'LEAD', 'MANAGER', 'QA', 'SUPPORT', 'TRAINER', 'SME', 'OPS'].indexOf(desig) !== -1) ||
+                    (role && ['ADMIN', 'MANAGER', 'LEAD', 'MANAGEMENT'].indexOf(role) !== -1) ||
+                    (tm === 'MANAGEMENT' || tm === 'SUPPORT');
+    var isProd = !isSupport;
+
+    var shift = normalizeShiftType(usr.default_shift || 'General');
+
+    // Filter by team
+    if (selectedTeam !== 'ALL' && tm !== selectedTeam.toUpperCase()) continue;
+    // Filter by shift
+    if (selectedShift !== 'ALL' && shift.toUpperCase() !== selectedShift.toUpperCase()) continue;
+
+    var uInfo = {
+      emp_id: usr.emp_id,
+      emp_name: usr.emp_name,
+      team: usr.team || 'Annotation',
+      isSupport: isSupport,
+      isProd: isProd,
+      defaultClient: usr.default_client || 'iMerit',
+      defaultProject: usr.default_project || 'AMBALL',
+      shiftType: shift
+    };
+    userMap[empKey] = uInfo;
+    userList.push(uInfo);
+  }
+
+  // 2. Identify slices and attendance mapping
+  var sliceMap = {};
+  var empAttendanceDaily = {}; // dateStr -> empKey -> attRow
+
+  for (var a = 0; a < allAttendance.length; a++) {
+    var att = allAttendance[a];
+    var aDate = att.normalizedDate;
+    if (!aDate) continue;
+    var aEmp = String(att.emp_id || '').trim().toLowerCase();
+    if (!userMap[aEmp]) continue;
+
+    if (!empAttendanceDaily[aDate]) empAttendanceDaily[aDate] = {};
+    empAttendanceDaily[aDate][aEmp] = att;
+  }
+
+  function getSliceInfo(dateStr) {
+    var dParts = dateStr.split('-');
+    var yr = parseInt(dParts[0], 10);
+    var mo = parseInt(dParts[1], 10) - 1;
+    var dy = parseInt(dParts[2], 10);
+    var dObj = new Date(yr, mo, dy);
+
+    if (period === 'month') {
+      var moShort = Utilities.formatDate(dObj, timeZone, 'MMM');
+      var moKey = dParts[0] + '-' + dParts[1];
+      var label = moShort;
+      var todayNormalized = Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd');
+      if (moKey === todayNormalized.substring(0, 7) && dy > 1) {
+        var daySuffix = (dy === 1 || dy === 21 || dy === 31) ? 'st' : ((dy === 2 || dy === 22) ? 'nd' : ((dy === 3 || dy === 23) ? 'rd' : 'th'));
+        label = moShort + ' till ' + dy + daySuffix;
+      }
+      return { key: moKey, label: label, sortOrder: moKey };
+    } else if (period === 'week') {
+      var wRange = getDateRangeForPeriod(dateStr, 'week', timeZone);
+      return { key: wRange.startDate, label: wRange.label, sortOrder: wRange.startDate };
+    } else {
+      return { key: dateStr, label: Utilities.formatDate(dObj, timeZone, 'dd MMM yyyy'), sortOrder: dateStr };
+    }
+  }
+
+  function getDatesForSlice(slKey, slLabel, periodType, dtStart, dtEnd) {
+    var dates = [];
+    if (periodType === 'day') {
+      dates.push(slKey);
+      return dates;
+    }
+    if (periodType === 'week') {
+      var p = slKey.split('-');
+      var baseDate = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+      for (var i = 0; i < 7; i++) {
+        var cur = new Date(baseDate.getTime() + (i * 24 * 60 * 60 * 1000));
+        dates.push(Utilities.formatDate(cur, timeZone, 'yyyy-MM-dd'));
+      }
+      return dates;
+    }
+    if (periodType === 'month') {
+      var parts = slKey.split('-');
+      var yr = parseInt(parts[0], 10);
+      var mo = parseInt(parts[1], 10); // 1-12
+      var tillMatch = slLabel && slLabel.match(/till\s+(\d+)/i);
+      var maxDays = tillMatch ? parseInt(tillMatch[1], 10) : new Date(yr, mo, 0).getDate();
+      for (var d = 1; d <= maxDays; d++) {
+        var dStr = (d < 10 ? '0' : '') + d;
+        var moStr = (mo < 10 ? '0' : '') + mo;
+        dates.push(yr + '-' + moStr + '-' + dStr);
+      }
+      return dates;
+    }
+    if (dtStart && dtEnd) {
+      var p1 = dtStart.split('-');
+      var p2 = dtEnd.split('-');
+      var d1 = new Date(parseInt(p1[0], 10), parseInt(p1[1], 10) - 1, parseInt(p1[2], 10));
+      var d2 = new Date(parseInt(p2[0], 10), parseInt(p2[1], 10) - 1, parseInt(p2[2], 10));
+      var curD = new Date(d1.getTime());
+      while (curD <= d2) {
+        dates.push(Utilities.formatDate(curD, timeZone, 'yyyy-MM-dd'));
+        curD.setTime(curD.getTime() + 24 * 60 * 60 * 1000);
+      }
+      if (dates.length > 0) return dates;
+    }
+    dates.push(slKey);
+    return dates;
+  }
+
+  // Populate tasks into slices
+  for (var t = 0; t < allTasks.length; t++) {
+    var tsk = allTasks[t];
+    var tDate = tsk.normalizedDate;
+    if (!tDate) continue;
+
+    var tEmp = String(tsk.emp_id || '').trim().toLowerCase();
+    var usr = userMap[tEmp];
+    if (!usr) continue;
+
+    var clientName = String(tsk.active_client || usr.defaultClient || 'iMerit').trim();
+    var projName = String(tsk.active_project || usr.defaultProject || 'AMBALL').trim();
+
+    if (selectedClient !== 'ALL' && clientName.toUpperCase() !== selectedClient.toUpperCase()) continue;
+    if (selectedProject !== 'ALL' && projName.toUpperCase() !== selectedProject.toUpperCase()) continue;
+
+    var projDisplay = clientName + ' - ' + projName;
+
+    var sInfo = getSliceInfo(tDate);
+    if (!sliceMap[sInfo.key]) {
+      sliceMap[sInfo.key] = { label: sInfo.label, sortOrder: sInfo.sortOrder, projects: {} };
+    }
+    if (!sliceMap[sInfo.key].projects[projDisplay]) {
+      sliceMap[sInfo.key].projects[projDisplay] = {
+        client: clientName,
+        project: projName,
+        tasks: [],
+        tasksByDateAndEmp: {}
+      };
+    }
+
+    var pObj = sliceMap[sInfo.key].projects[projDisplay];
+    pObj.tasks.push(tsk);
+    if (!pObj.tasksByDateAndEmp[tDate]) pObj.tasksByDateAndEmp[tDate] = {};
+    if (!pObj.tasksByDateAndEmp[tDate][tEmp]) pObj.tasksByDateAndEmp[tDate][tEmp] = [];
+    pObj.tasksByDateAndEmp[tDate][tEmp].push(tsk);
+  }
+
+  // Baseline fallback if sliceMap is empty or projects need registration
+  var activeDateStr = targetDate || Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd');
+  var activeSlice = getSliceInfo(activeDateStr);
+  if (!sliceMap[activeSlice.key]) {
+    sliceMap[activeSlice.key] = { label: activeSlice.label, sortOrder: activeSlice.sortOrder, projects: {} };
+  }
+
+  var hasFilteredProject = (selectedProject !== 'ALL' || selectedClient !== 'ALL');
+  if (hasFilteredProject) {
+    for (var uIdx = 0; uIdx < userList.length; uIdx++) {
+      var uInf = userList[uIdx];
+      var pDisplay = (uInf.defaultClient || 'iMerit') + ' - ' + (uInf.defaultProject || 'AMBALL');
+      if (selectedClient !== 'ALL' && uInf.defaultClient.toUpperCase() !== selectedClient.toUpperCase()) continue;
+      if (selectedProject !== 'ALL' && uInf.defaultProject.toUpperCase() !== selectedProject.toUpperCase()) continue;
+
+      for (var sKey in sliceMap) {
+        if (!sliceMap[sKey].projects[pDisplay]) {
+          sliceMap[sKey].projects[pDisplay] = {
+            client: uInf.defaultClient || 'iMerit',
+            project: uInf.defaultProject || 'AMBALL',
+            tasks: [],
+            tasksByDateAndEmp: {}
+          };
+        }
+      }
+    }
+  }
+
+  // Ensure active slice has at least one project
+  for (var sKey in sliceMap) {
+    if (Object.keys(sliceMap[sKey].projects).length === 0) {
+      var defClient = selectedClient !== 'ALL' ? selectedClient : 'iMerit';
+      var defProj = selectedProject !== 'ALL' ? selectedProject : 'AMBALL';
+      var defKey = defClient + ' - ' + defProj;
+      sliceMap[sKey].projects[defKey] = {
+        client: defClient,
+        project: defProj,
+        tasks: [],
+        tasksByDateAndEmp: {}
+      };
+    }
+  }
+
+  // 3. Compute metric rows across all slices and projects
+  var sortedSliceKeys = Object.keys(sliceMap).sort(function(a, b) {
+    return sliceMap[a].sortOrder.localeCompare(sliceMap[b].sortOrder);
+  });
+
+  var totalProdHCSum = 0;
+  var totalSupportHCSum = 0;
+  var totalAvailHoursSum = 0;
+  var totalActiveProdHoursSum = 0;
+  var totalTrainingHoursSum = 0;
+  var totalIdleHoursSum = 0;
+  var totalDownTimeHoursSum = 0;
+  var totalMeetingHoursSum = 0;
+  var totalLeaveHoursSum = 0;
+
+  for (var k = 0; k < sortedSliceKeys.length; k++) {
+    var slKey = sortedSliceKeys[k];
+    var slObj = sliceMap[slKey];
+    var datesInSlice = getDatesForSlice(slKey, slObj.label, period, startDate, endDate);
+    var totalDaysCount = datesInSlice.length || 1;
+
+    for (var pName in slObj.projects) {
+      var prj = slObj.projects[pName];
+      var sumDailyProdHC = 0;
+      var sumDailySupportHC = 0;
+      var sumDailyAvailProdHrs = 0;
+      var prjLeaveHrs = 0;
+
+      // Iterate through EVERY calendar day in the selected range
+      // Days with 0 employee logins contribute 0 headcount and are NOT omitted from the average divisor
+      for (var d = 0; d < datesInSlice.length; d++) {
+        var dtStr = datesInSlice[d];
+        var dailyProdHC = 0;
+        var dailySupportHC = 0;
+        var dailyAvailProdHrs = 0;
+
+        for (var e = 0; e < userList.length; e++) {
+          var usr = userList[e];
+          var empIdLower = String(usr.emp_id || '').trim().toLowerCase();
+
+          var uTasks = (prj.tasksByDateAndEmp[dtStr] && prj.tasksByDateAndEmp[dtStr][empIdLower]) ? prj.tasksByDateAndEmp[dtStr][empIdLower] : [];
+          
+          function cleanMatchStr(str) {
+            return String(str || '').toUpperCase().replace(/[\s\-_]/g, '');
+          }
+
+          var belongsToProject = (uTasks.length > 0) ||
+            ((selectedProject === 'ALL' || cleanMatchStr(usr.defaultProject) === cleanMatchStr(prj.project)) &&
+             (selectedClient === 'ALL' || cleanMatchStr(usr.defaultClient) === cleanMatchStr(prj.client)));
+
+          if (!belongsToProject) continue;
+
+          var att = (empAttendanceDaily[dtStr] && empAttendanceDaily[dtStr][empIdLower]) ? empAttendanceDaily[dtStr][empIdLower] : null;
+          var attStatus = att ? String(att.attendance_status || '').toUpperCase() : '';
+          var shStatus = att ? String(att.shift_status || '').toUpperCase() : '';
+          var empShift = (att && att.shift_type) ? normalizeShiftType(att.shift_type) : usr.shiftType;
+          var stdH = getShiftStandardHours(empShift);
+
+          // 1. Week Off or Holiday: strictly EXCLUDE from Head Count and Production Hours ONLY IF NO WORK LOGS RECORDED
+          var isWOorHoliday = (attStatus === 'WO' || shStatus === 'WO' || attStatus === 'HOLIDAY' || shStatus === 'HOLIDAY');
+          if (isWOorHoliday && uTasks.length === 0) {
+            continue;
+          }
+
+          // 2. Full Day Leave: strictly EXCLUDE from active Head Count and Production Hours ONLY IF NO WORK LOGS RECORDED
+          var isFullLeave = (uTasks.length === 0) && (['PL', 'UL', 'ABSENT', 'LEAVE_CLOSED'].indexOf(attStatus) !== -1 || shStatus === 'LEAVE_CLOSED');
+          if (isFullLeave) {
+            var lHrs = (att && Number(att.leave_hours) > 0) ? Number(att.leave_hours) : stdH;
+            prjLeaveHrs += lHrs;
+            continue;
+          }
+
+          // 3. Partial Leave / Overlapping Leave Hours
+          if (attStatus === 'HL') {
+            prjLeaveHrs += (stdH / 2.0);
+          } else if (attStatus === 'PERMISSION' || attStatus === 'PERM') {
+            prjLeaveHrs += (att && Number(att.permission_hours) > 0 ? Number(att.permission_hours) : 2.0);
+          } else if (att && Number(att.leave_hours) > 0 && uTasks.length > 0) {
+            var actualTaskHrs = uTasks.reduce(function(acc, t) { return acc + (Number(t.actual_worked_hours) || 0); }, 0);
+            var effectiveLeave = Math.max(0, stdH - actualTaskHrs);
+            prjLeaveHrs += effectiveLeave;
+          }
+
+          // 4. Activity qualification:
+          // Support Head Count: calculated from records where activity_type === 'Support'
+          // Support headcount does NOT count toward Production Hours
+          // Production Hours calculated using ONLY employees assigned to Production, Idle, Down Time, Client Meeting, or Internal Meeting
+          // Exclude Support and Training from Production Hours
+          if (uTasks.length > 0) {
+            var hasSupport = uTasks.some(function(t) { return t.activity_type === 'Support'; });
+            var hasProdQual = uTasks.some(function(t) {
+              return ['Production', 'Idle', 'Down Time', 'Client Meeting', 'Internal Meeting'].indexOf(t.activity_type) !== -1;
+            });
+            var onlyTraining = !hasSupport && !hasProdQual && uTasks.some(function(t) {
+              return t.activity_type === 'Training (Material Go-Through)';
+            });
+
+            if (hasSupport && !hasProdQual) {
+              dailySupportHC++;
+            }
+            if (hasProdQual) {
+              dailyProdHC++;
+              dailyAvailProdHrs += stdH;
+            }
+          } else {
+            var isClocked = att && (shStatus === 'OPEN' || shStatus === 'CLOSED' || attStatus === 'PRESENT');
+            if (isClocked) {
+              if (usr.isSupport) {
+                dailySupportHC++;
+              } else {
+                dailyProdHC++;
+                dailyAvailProdHrs += stdH;
+              }
+            }
+          }
+        }
+
+        sumDailyProdHC += dailyProdHC;
+        sumDailySupportHC += dailySupportHC;
+        sumDailyAvailProdHrs += dailyAvailProdHrs;
+      }
+
+      var avgProdHC = Number((sumDailyProdHC / totalDaysCount).toFixed(2));
+      var avgSupportHC = Number((sumDailySupportHC / totalDaysCount).toFixed(2));
+      var availProdHours = Number(sumDailyAvailProdHrs.toFixed(2));
+
+      // Benchmark fallback if employees are scheduled
+      if (availProdHours === 0 && avgProdHC > 0) {
+        var defaultStdHrs = getShiftStandardHours(selectedShift !== 'ALL' ? selectedShift : 'General');
+        availProdHours = Number((avgProdHC * defaultStdHrs * totalDaysCount).toFixed(2));
+      }
+
+      var activeProdHrs = 0;
+      var trainingHrs = 0;
+      var idleHrs = 0;
+      var downTimeHrs = 0;
+      var meetingHrs = 0;
+
+      for (var tk = 0; tk < prj.tasks.length; tk++) {
+        var tTask = prj.tasks[tk];
+        var actType = tTask.activity_type || 'Production';
+        var actHrs = Number(tTask.actual_worked_hours) || 0;
+
+        if (actType === 'Production') {
+          activeProdHrs += actHrs;
+        } else if (actType === 'Training (Material Go-Through)') {
+          trainingHrs += actHrs;
+        } else if (actType === 'Idle') {
+          idleHrs += actHrs;
+        } else if (actType === 'Down Time') {
+          downTimeHrs += actHrs;
+        } else if (actType === 'Client Meeting' || actType === 'Internal Meeting') {
+          meetingHrs += actHrs;
+        }
+      }
+
+      activeProdHrs = Number(activeProdHrs.toFixed(2));
+      trainingHrs = Number(trainingHrs.toFixed(2));
+      idleHrs = Number(idleHrs.toFixed(2));
+      downTimeHrs = Number(downTimeHrs.toFixed(2));
+      meetingHrs = Number(meetingHrs.toFixed(2));
+      var leaveHrs = Number(prjLeaveHrs.toFixed(2));
+
+      // Distinct Task Contributor Safeguard:
+      // If qualifying productive work logs exist on this project/date slice, Head Count and Available Prod Hours must NEVER be 0
+      if (avgProdHC === 0 && (activeProdHrs > 0 || idleHrs > 0 || meetingHrs > 0 || downTimeHrs > 0)) {
+        var distinctEmps = {};
+        for (var tk2 = 0; tk2 < prj.tasks.length; tk2++) {
+          var tTk2 = prj.tasks[tk2];
+          var aTyp2 = tTk2.activity_type || 'Production';
+          if (['Production', 'Idle', 'Down Time', 'Client Meeting', 'Internal Meeting'].indexOf(aTyp2) !== -1) {
+            distinctEmps[String(tTk2.emp_id || '').trim().toLowerCase()] = true;
+          }
+        }
+        var countDistinct = Object.keys(distinctEmps).length;
+        if (countDistinct > 0) {
+          avgProdHC = Number((countDistinct / totalDaysCount).toFixed(2));
+          var defaultShiftH = getShiftStandardHours(selectedShift !== 'ALL' ? selectedShift : 'General');
+          availProdHours = Number((avgProdHC * defaultShiftH * totalDaysCount).toFixed(2));
+        }
+      }
+
+      var prodUtilPct = availProdHours > 0 ? Number(((activeProdHrs / availProdHours) * 100).toFixed(2)) : 0;
+      var nonProdPct = availProdHours > 0 ? Number((((trainingHrs + idleHrs + downTimeHrs + meetingHrs) / availProdHours) * 100).toFixed(2)) : 0;
+
+      // Skip empty/phantom rows if not explicitly filtered and no activity/headcount recorded
+      if (selectedProject === 'ALL' && selectedClient === 'ALL' && prj.tasks.length === 0 && avgProdHC === 0 && avgSupportHC === 0 && availProdHours === 0 && activeProdHrs === 0) {
+        continue;
+      }
+
+      rows.push({
+        period: slObj.label,
+        projectName: pName,
+        prodHeadCount: avgProdHC,
+        supportHeadCount: avgSupportHC,
+        totalAvailableProdHrs: availProdHours,
+        activeProductionHrs: activeProdHrs,
+        trainingHrs: trainingHrs,
+        idleHrs: idleHrs,
+        downTimeHrs: downTimeHrs,
+        meetingHrs: meetingHrs,
+        leaveHrs: leaveHrs,
+        productionUtilizationPct: prodUtilPct,
+        nonProductiveHoursPct: nonProdPct
+      });
+
+      totalProdHCSum += avgProdHC;
+      totalSupportHCSum += avgSupportHC;
+      totalAvailHoursSum += availProdHours;
+      totalActiveProdHoursSum += activeProdHrs;
+      totalTrainingHoursSum += trainingHrs;
+      totalIdleHoursSum += idleHrs;
+      totalDownTimeHoursSum += downTimeHrs;
+      totalMeetingHoursSum += meetingHrs;
+      totalLeaveHoursSum += leaveHrs;
+    }
+  }
+
+  if (rows.length === 0) {
+    var defClient = selectedClient !== 'ALL' ? selectedClient : 'iMerit';
+    var defProj = selectedProject !== 'ALL' ? selectedProject : 'AMBALL';
+    rows.push({
+      period: activeSlice.label,
+      projectName: defClient + ' - ' + defProj,
+      prodHeadCount: 0,
+      supportHeadCount: 0,
+      totalAvailableProdHrs: 0,
+      activeProductionHrs: 0,
+      trainingHrs: 0,
+      idleHrs: 0,
+      downTimeHrs: 0,
+      meetingHrs: 0,
+      leaveHrs: 0,
+      productionUtilizationPct: 0,
+      nonProductiveHoursPct: 0
+    });
+  }
+
+  var rowCount = rows.length || 1;
+  var overallAvgProdHC = Number((totalProdHCSum / rowCount).toFixed(2));
+  var overallAvgSupportHC = Number((totalSupportHCSum / rowCount).toFixed(2));
+  var overallAvailProdHrs = Number(totalAvailHoursSum.toFixed(2));
+  var overallActiveProdHrs = Number(totalActiveProdHoursSum.toFixed(2));
+  var overallTrainingHrs = Number(totalTrainingHoursSum.toFixed(2));
+  var overallIdleHrs = Number(totalIdleHoursSum.toFixed(2));
+  var overallDownTimeHrs = Number(totalDownTimeHoursSum.toFixed(2));
+  var overallMeetingHrs = Number(totalMeetingHoursSum.toFixed(2));
+  var overallLeaveHrs = Number(totalLeaveHoursSum.toFixed(2));
+
+  var overallProdUtilPct = overallAvailProdHrs > 0 ? Number(((overallActiveProdHrs / overallAvailProdHrs) * 100).toFixed(2)) : 0;
+  var overallNonProdPct = overallAvailProdHrs > 0 ? Number((((overallTrainingHrs + overallIdleHrs + overallDownTimeHrs + overallMeetingHrs) / overallAvailProdHrs) * 100).toFixed(2)) : 0;
+
+  var totalRow = {
+    period: 'Total',
+    projectName: '',
+    prodHeadCount: overallAvgProdHC,
+    supportHeadCount: overallAvgSupportHC,
+    totalAvailableProdHrs: overallAvailProdHrs,
+    activeProductionHrs: overallActiveProdHrs,
+    trainingHrs: overallTrainingHrs,
+    idleHrs: overallIdleHrs,
+    downTimeHrs: overallDownTimeHrs,
+    meetingHrs: overallMeetingHrs,
+    leaveHrs: overallLeaveHrs,
+    productionUtilizationPct: overallProdUtilPct,
+    nonProductiveHoursPct: overallNonProdPct
+  };
+
+  return {
+    columns: [
+      'Month', 'Project Name', 'Prod Head Count', 'Support Head Count',
+      'Total Available Production Hrs', 'Active production Hours', 'Training (Client + Internal)',
+      'Idle', 'Down Time', 'Meeting (Client + Internal)', 'Leave',
+      'Production Utilization %', 'Non Productive Hours %'
+    ],
+    rows: rows,
+    total: totalRow
+  };
 }
 
 /**
@@ -2340,8 +2918,7 @@ function syncExternalDailySummaryRecords(dateStr, empId) {
 
     // 3. Fetch Task Logs for dateStr + empId from Project_Task_Logs
     var tSheet = masterSs.getSheetByName(SHEET_NAMES.PROJECT_LOGS);
-    var earnedHrs = 0;
-    var leakageHrs = 0;
+    var loggedTaskHrs = 0;
     if (tSheet) {
       var tData = tSheet.getDataRange().getValues();
       if (tData.length > 1) {
@@ -2349,8 +2926,7 @@ function syncExternalDailySummaryRecords(dateStr, empId) {
         var teIdx = tHeaders.indexOf('emp_id');
         var wsIdx = tHeaders.indexOf('work_start_time');
         var createdIdx = tHeaders.indexOf('created_at');
-        var prodIdx = tHeaders.indexOf('productive_hours');
-        var leakIdx = tHeaders.indexOf('performance_leakage_hours');
+        var actHrsIdx = tHeaders.indexOf('actual_worked_hours');
         var targetEmpLower = String(empId).trim().toLowerCase();
 
         for (var t = 1; t < tData.length; t++) {
@@ -2359,8 +2935,7 @@ function syncExternalDailySummaryRecords(dateStr, empId) {
           var rEmp = teIdx !== -1 ? String(tData[t][teIdx]).trim().toLowerCase() : '';
 
           if (rEmp === targetEmpLower && tDate === normalizedDate) {
-            earnedHrs += Number(tData[t][prodIdx]) || 0;
-            leakageHrs += Number(tData[t][leakIdx]) || 0;
+            loggedTaskHrs += actHrsIdx !== -1 ? (Number(tData[t][actHrsIdx]) || 0) : 0;
           }
         }
       }
@@ -2374,7 +2949,7 @@ function syncExternalDailySummaryRecords(dateStr, empId) {
 
     var startTimeStr = (!isFullLeaveSync && shiftLog && shiftLog.shift_start_time) ? (shiftLog.shift_start_time instanceof Date ? Utilities.formatDate(shiftLog.shift_start_time, timeZone, 'HH:mm:ss') : String(shiftLog.shift_start_time)) : '--:--';
     var endTimeStr = (!isFullLeaveSync && shiftLog && shiftLog.shift_end_time) ? (shiftLog.shift_end_time instanceof Date ? Utilities.formatDate(shiftLog.shift_end_time, timeZone, 'HH:mm:ss') : String(shiftLog.shift_end_time)) : '--:--';
-    var breakMins = shiftLog ? Number(shiftLog.total_break_minutes) || 0 : 0;
+    var breakMins = 60; // Fixed 1-hour break auto-deducted
     var rawNetWorked = shiftLog ? Number(shiftLog.total_shift_hours) || 0 : 0;
     var netWorkedHrs = isFullLeaveSync ? 0 : (isHalfLeaveSync ? Math.min(4.50, rawNetWorked) : rawNetWorked);
     var proofUrl = shiftLog ? (shiftLog.proof_url || '') : '';
@@ -2431,7 +3006,7 @@ function syncExternalDailySummaryRecords(dateStr, empId) {
     var rowPayload = [
       normalizedDate, user.emp_id, user.emp_name, teamName, modeName,
       shiftStatus, attStatus, startTimeStr, endTimeStr,
-      breakMins, netWorkedHrs, Number(earnedHrs.toFixed(2)), Number(leakageHrs.toFixed(2)),
+      breakMins, netWorkedHrs, Number(loggedTaskHrs.toFixed(2)), 0,
       proofUrl, Utilities.formatDate(new Date(), timeZone, 'yyyy-MM-dd HH:mm:ss')
     ];
 
